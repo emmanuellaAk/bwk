@@ -16,12 +16,12 @@ function BraiderOS() {
   return (
     <AppShell activeTab={tab} onTabChange={setTab}>
       {tab === 'chat'      && <ChatHome />}
-      {tab === 'home'      && <DashboardPage />}
+      {tab === 'home'      && <DashboardPage onNavigate={setTab} />}
       {tab === 'calendar'  && <CalendarPage />}
       {tab === 'clients'   && <ClientsPage />}
       {tab === 'finance'   && <FinancePage />}
-      {tab === 'inventory' && <DashboardPage />}
-      {tab === 'suppliers' && <DashboardPage />}
+      {tab === 'inventory' && <DashboardPage onNavigate={setTab} />}
+      {tab === 'suppliers' && <DashboardPage onNavigate={setTab} />}
     </AppShell>
   )
 }
