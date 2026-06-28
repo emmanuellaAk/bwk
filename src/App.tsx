@@ -6,6 +6,8 @@ import { CalendarPage } from '@/pages/CalendarPage'
 import { ClientsPage } from '@/pages/ClientsPage'
 import { FinancePage } from '@/pages/FinancePage'
 import { DashboardPage } from '@/pages/DashboardPage'
+import { InventoryPage } from '@/pages/InventoryPage'
+import { SuppliersPage } from '@/pages/SuppliersPage'
 import type { Tab } from '@/components/layout/BottomNav'
 
 const queryClient = new QueryClient()
@@ -20,8 +22,8 @@ function BraiderOS() {
       {tab === 'calendar'  && <CalendarPage />}
       {tab === 'clients'   && <ClientsPage />}
       {tab === 'finance'   && <FinancePage />}
-      {tab === 'inventory' && <DashboardPage onNavigate={setTab} />}
-      {tab === 'suppliers' && <DashboardPage onNavigate={setTab} />}
+      {tab === 'inventory' && <InventoryPage onNavigate={setTab} />}
+      {tab === 'suppliers' && <SuppliersPage />}
     </AppShell>
   )
 }
