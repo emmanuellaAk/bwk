@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import { initials, colorHex } from '@/lib/braider'
+import type { BookingRecord } from '@/lib/types'
 
 type View = 'day' | 'week' | 'month'
 type Kind = 'confirmed' | 'available' | 'blocked'
@@ -52,16 +54,33 @@ const WEEK_STATS = [
   { label: 'Open slots',   value: '4' },
 ]
 
-export function CalendarPage() {
+export function CalendarPage({ bookings = [] }: { bookings?: BookingRecord[] }) {
   const [view, setView] = useState<View>('week')
   const [selectedDay, setSelectedDay] = useState(1) // Tue = today
   const [activeFilters, setActiveFilters] = useState<Set<Kind>>(new Set(['confirmed', 'available', 'blocked']))
+
+  // Convert live bookings into calendar events
+  const liveEvents = bookings.map(b => ({
+    time:   b.time.replace(' AM', '').replace(' PM', ''),
+    name:   b.name,
+    style:  b.service,
+    kind:   'confirmed' as Kind,
+    dayIdx: b.dayIdx,
+    colorHex: colorHex(b.color),
+    initials: initials(b.name),
+    isLive: true,
+  }))
+
+  const allEvents = [
+    ...ALL_EVENTS.map(e => ({ ...e, colorHex: undefined as string | undefined, initials: undefined as string | undefined, isLive: false })),
+    ...liveEvents,
+  ]
 
   const toggleFilter = (kind: Kind) => {
     setActiveFilters(prev => {
       const next = new Set(prev)
       if (next.has(kind)) {
-        if (next.size === 1) return prev // keep at least one active
+        if (next.size === 1) return prev
         next.delete(kind)
       } else {
         next.add(kind)
@@ -70,10 +89,10 @@ export function CalendarPage() {
     })
   }
 
-  const visibleEvents = ALL_EVENTS
+  const visibleEvents = allEvents
     .filter(e => e.dayIdx === selectedDay && activeFilters.has(e.kind))
 
-  const todayConfirmed = ALL_EVENTS.filter(e => e.dayIdx === selectedDay && e.kind === 'confirmed')
+  const todayConfirmed = allEvents.filter(e => e.dayIdx === selectedDay && e.kind === 'confirmed')
 
   return (
     <div className="p-6 h-full overflow-y-auto bos-scroll" style={{ animation: 'bosUp 0.35s ease both' }}>
@@ -109,7 +128,7 @@ export function CalendarPage() {
           <div className="flex gap-[5px] mb-4">
             {CAL_WEEK.map((c, i) => {
               const isSelected = i === selectedDay
-              const dayCount = ALL_EVENTS.filter(e => e.dayIdx === i && e.kind === 'confirmed').length
+              const dayCount = allEvents.filter(e => e.dayIdx === i && e.kind === 'confirmed').length
               return (
                 <button
                   key={c.d}
@@ -186,7 +205,15 @@ export function CalendarPage() {
                       {e.time}
                     </div>
                     <div className={cn('flex-1 border-l-[3px] rounded-[12px] py-[11px] px-[13px] cursor-pointer hover:brightness-95 transition-all', s.bg, s.bar)}>
-                      <div className={cn('font-bold text-[13.5px]', s.nameColor)}>{e.name}</div>
+                      <div className="flex items-center gap-2">
+                        {e.isLive && e.colorHex && (
+                          <span className="w-[22px] h-[22px] rounded-[7px] flex items-center justify-center text-white font-bold text-[8px] font-serif flex-none" style={{ background: e.colorHex }}>
+                            {e.initials}
+                          </span>
+                        )}
+                        <div className={cn('font-bold text-[13.5px]', s.nameColor)}>{e.name}</div>
+                        {e.isLive && <span className="text-[9px] font-bold bg-plum text-white px-[6px] py-[2px] rounded-full">NEW</span>}
+                      </div>
                       <div className={cn('text-[11.5px] mt-[2px] font-medium', s.text)}>{e.style}</div>
                     </div>
                   </div>

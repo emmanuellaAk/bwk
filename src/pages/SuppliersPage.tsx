@@ -75,8 +75,8 @@ const SUPPLIERS: Supplier[] = [
   },
 ]
 
-const TruckIcon = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+const TruckIcon = ({ color = 'white' }: { color?: string }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M10 17h4V5H2v12h2M14 9h4l3 4v4h-3"/>
     <circle cx="7" cy="18" r="2"/>
     <circle cx="17" cy="18" r="2"/>
@@ -85,10 +85,21 @@ const TruckIcon = () => (
 
 export function SuppliersPage() {
   const [selectedIdx, setSelectedIdx] = useState(0)
+  const [toast, setToast]             = useState<string | null>(null)
   const s = SUPPLIERS[selectedIdx]
 
+  const showToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(null), 2800)
+  }
+
   return (
-    <div className="flex h-full overflow-hidden" style={{ animation: 'bosUp 0.35s ease both' }}>
+    <div className="flex h-full overflow-hidden relative" style={{ animation: 'bosUp 0.35s ease both' }}>
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-ink text-white text-[13px] font-semibold px-5 py-3 rounded-[14px] shadow-lg" style={{ animation: 'bosUp 0.25s ease both' }}>
+          {toast}
+        </div>
+      )}
 
       {/* Left: supplier list */}
       <div className="flex flex-col border-r border-line bg-surface overflow-y-auto bos-scroll flex-none w-full lg:w-[320px]">
@@ -111,7 +122,7 @@ export function SuppliersPage() {
                 'w-[44px] h-[44px] rounded-[14px] flex items-center justify-center flex-none',
                 selectedIdx === i ? 'bg-plum' : 'bg-surface-2'
               )}>
-                <TruckIcon />
+                <TruckIcon color={selectedIdx === i ? 'white' : '#6E1B3A'} />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-bold text-[14px] text-ink truncate">{sup.name}</div>
@@ -176,7 +187,10 @@ export function SuppliersPage() {
                 </div>
               ))}
             </div>
-            <button className="mt-4 w-full bg-plum text-white border-none h-[48px] rounded-[14px] font-bold text-[13.5px] cursor-pointer hover:opacity-90 transition-opacity">
+            <button
+              className="mt-4 w-full bg-plum text-white border-none h-[48px] rounded-[14px] font-bold text-[13.5px] cursor-pointer hover:opacity-90 transition-opacity"
+              onClick={() => showToast(`Order placed with ${s.name} ✓`)}
+            >
               Place new order
             </button>
           </div>

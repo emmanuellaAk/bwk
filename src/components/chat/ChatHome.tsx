@@ -3,6 +3,8 @@ import { useChat } from '@/lib/api/hooks/useChat'
 import { useNudges } from '@/lib/api/hooks/useNudges'
 import { ProactiveNudgeCard } from './ProactiveNudgeCard'
 import { BookingCard } from './BookingCard'
+import { EarningsMiniCard } from './EarningsMiniCard'
+import { AvailConfirmCard } from './AvailConfirmCard'
 import { Composer } from './Composer'
 
 const LogoAvatar = () => (
@@ -123,12 +125,15 @@ export function ChatHome() {
                 {/* Booking card */}
                 {msg.booking && (
                   <div className="ml-[37px] w-[min(360px,90%)]">
-                    <BookingCard
-                      booking={msg.booking}
-                      onConfirm={confirmBooking}
-                    />
+                    <BookingCard booking={msg.booking} onConfirm={confirmBooking} />
                   </div>
                 )}
+
+                {/* Earnings card */}
+                {msg.earnings && <EarningsMiniCard {...msg.earnings} />}
+
+                {/* Availability confirm */}
+                {msg.avail && <AvailConfirmCard {...msg.avail} />}
               </div>
             )
           })}

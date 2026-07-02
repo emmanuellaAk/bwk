@@ -25,7 +25,7 @@ interface BottomNavProps {
 
 export function BottomNav({ active, onChange }: BottomNavProps) {
   return (
-    <nav className="flex-none bg-surface border-t border-line flex items-center justify-around px-2 pb-[env(safe-area-inset-bottom)]">
+    <nav className="md:hidden flex-none bg-surface border-t border-line flex items-center justify-around px-2 pb-[env(safe-area-inset-bottom)]">
       {NAV_ITEMS.map(({ id, label, Icon, center }) => {
         const isActive = active === id
 

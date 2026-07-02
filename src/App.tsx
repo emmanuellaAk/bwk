@@ -8,23 +8,37 @@ import { FinancePage } from '@/pages/FinancePage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { InventoryPage } from '@/pages/InventoryPage'
 import { SuppliersPage } from '@/pages/SuppliersPage'
+import { BookingPortal } from '@/components/portal/BookingPortal'
+import { LoginPage } from '@/pages/LoginPage'
 import type { Tab } from '@/components/layout/BottomNav'
+import type { BookingRecord } from '@/lib/types'
 
 const queryClient = new QueryClient()
 
 function BraiderOS() {
-  const [tab, setTab] = useState<Tab>('chat')
+  const [loggedIn, setLoggedIn] = useState(false)
+  const [tab,      setTab]      = useState<Tab>('home')
+  const [portal,   setPortal]   = useState(false)
+  const [bookings, setBookings] = useState<BookingRecord[]>([])
+
+  const handleBook = (b: BookingRecord) =>
+    setBookings(prev => [b, ...prev])
+
+  if (!loggedIn) return <LoginPage onLogin={() => setLoggedIn(true)} />
 
   return (
-    <AppShell activeTab={tab} onTabChange={setTab}>
-      {tab === 'chat'      && <ChatHome />}
-      {tab === 'home'      && <DashboardPage onNavigate={setTab} />}
-      {tab === 'calendar'  && <CalendarPage />}
-      {tab === 'clients'   && <ClientsPage />}
-      {tab === 'finance'   && <FinancePage />}
-      {tab === 'inventory' && <InventoryPage onNavigate={setTab} />}
-      {tab === 'suppliers' && <SuppliersPage />}
-    </AppShell>
+    <>
+      <AppShell activeTab={tab} onTabChange={setTab} onOpenPortal={() => setPortal(true)}>
+        {tab === 'chat'      && <ChatHome />}
+        {tab === 'home'      && <DashboardPage onNavigate={setTab} bookings={bookings} />}
+        {tab === 'calendar'  && <CalendarPage bookings={bookings} />}
+        {tab === 'clients'   && <ClientsPage onNavigate={setTab} />}
+        {tab === 'finance'   && <FinancePage />}
+        {tab === 'inventory' && <InventoryPage onNavigate={setTab} />}
+        {tab === 'suppliers' && <SuppliersPage />}
+      </AppShell>
+      {portal && <BookingPortal onClose={() => setPortal(false)} onBook={handleBook} />}
+    </>
   )
 }
 

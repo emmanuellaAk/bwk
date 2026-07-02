@@ -1,6 +1,7 @@
 import { colorHex, initials, cedi } from '@/lib/braider'
 import { cn } from '@/lib/utils'
 import type { Tab } from '@/components/layout/BottomNav'
+import type { BookingRecord } from '@/lib/types'
 
 const EARN_STATS = [
   { label: 'Today',       value: 'GH₵620',   delta: '2 appointments done', up: true  },
@@ -32,9 +33,12 @@ const SparkleIcon = () => (
 
 interface Props {
   onNavigate: (tab: Tab) => void
+  bookings:   BookingRecord[]
 }
 
-export function DashboardPage({ onNavigate }: Props) {
+export function DashboardPage({ onNavigate, bookings }: Props) {
+  // dayIdx 1 = Tue Jul 14 (today in the demo)
+  const newToday = bookings.filter(b => b.dayIdx === 1)
   const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
 
   return (
@@ -80,7 +84,7 @@ export function DashboardPage({ onNavigate }: Props) {
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-bold text-[15px] text-ink m-0">
-              Today · {APPOINTMENTS.length} appointments
+              Today · {APPOINTMENTS.length + newToday.length} appointments
             </h2>
             <button
               onClick={() => onNavigate('calendar')}
@@ -91,6 +95,36 @@ export function DashboardPage({ onNavigate }: Props) {
           </div>
 
           <div className="flex flex-col gap-[9px]">
+            {newToday.map(b => {
+              const hex = colorHex(b.color)
+              const bal = b.price - b.deposit
+              const [t, ap] = b.time.split(' ')
+              return (
+                <div
+                  key={b.id}
+                  className="bg-plum-soft border border-plum/20 rounded-[16px] p-[14px_16px] flex items-center gap-4 shadow-[0_1px_6px_rgba(110,27,58,0.07)] cursor-pointer"
+                >
+                  <div className="text-center flex-none w-[46px]">
+                    <div className="font-serif font-bold text-[15px] text-ink leading-none">{t}</div>
+                    <div className="text-[10px] text-muted font-semibold mt-[3px]">{ap}</div>
+                  </div>
+                  <div className="w-px self-stretch bg-plum/20 flex-none" />
+                  <span className="w-[40px] h-[40px] rounded-[12px] flex items-center justify-center text-white font-bold text-[14px] font-serif flex-none" style={{ background: hex }}>
+                    {initials(b.name)}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-[14px] text-ink leading-tight">{b.name}</div>
+                    <div className="text-[12px] text-muted mt-[3px]">{b.service} · {b.color}</div>
+                  </div>
+                  <div className="text-right flex-none">
+                    <div className="font-bold text-[14px] text-ink">{cedi(b.price)}</div>
+                    <span className="inline-block text-[10.5px] font-bold px-[9px] py-[4px] rounded-[20px] mt-[4px] bg-draft-bg text-draft">
+                      {cedi(bal)} due
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
             {APPOINTMENTS.map(a => {
               const hex = colorHex(a.color)
               const bal = a.price - a.deposit

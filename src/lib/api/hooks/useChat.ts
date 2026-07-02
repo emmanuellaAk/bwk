@@ -3,12 +3,19 @@ import { useMutation } from '@tanstack/react-query'
 import { apiClient } from '../client'
 import type { Booking, BookingDraft } from '../types'
 
+export interface EarningsData {
+  delta: string; revenue: string; expenses: string; completed: number; profit: string
+}
+export interface AvailData { title: string; body: string }
+
 export interface ChatEntry {
   id: string
   role: 'user' | 'assistant'
   text: string
   streaming?: boolean
   booking?: Booking
+  earnings?: EarningsData
+  avail?: AvailData
 }
 
 let msgCounter = 0
@@ -31,6 +38,8 @@ export function useChat() {
       ])
 
       let pendingBooking: Booking | undefined
+      let pendingEarnings: ChatEntry['earnings'] | undefined
+      let pendingAvail:    ChatEntry['avail']    | undefined
 
       for await (const chunk of apiClient.streamMessage(text)) {
         if (chunk.token !== undefined) {
@@ -39,15 +48,15 @@ export function useChat() {
             prev.map(m => m.id === aiId ? { ...m, text: m.text + token } : m)
           )
         }
-        if (chunk.booking) {
-          pendingBooking = chunk.booking
-        }
+        if (chunk.booking)  pendingBooking  = chunk.booking
+        if (chunk.earnings) pendingEarnings = chunk.earnings
+        if (chunk.avail)    pendingAvail    = chunk.avail
       }
 
       setMessages(prev =>
         prev.map(m =>
           m.id === aiId
-            ? { ...m, streaming: false, booking: pendingBooking }
+            ? { ...m, streaming: false, booking: pendingBooking, earnings: pendingEarnings, avail: pendingAvail }
             : m
         )
       )

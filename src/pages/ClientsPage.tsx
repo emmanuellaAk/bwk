@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { colorHex, initials, cedi } from '@/lib/braider'
 import { cn } from '@/lib/utils'
+import type { Tab } from '@/components/layout/BottomNav'
 
 interface HistoryEntry { date: string; style: string; amt: number }
 interface Client {
@@ -70,9 +71,15 @@ const ChevronLeft = () => (
   </svg>
 )
 
-export function ClientsPage() {
+export function ClientsPage({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
   const [search, setSearch]       = useState('')
   const [selectedIdx, setSelected] = useState<number | null>(null)
+  const [toast, setToast]         = useState<string | null>(null)
+
+  const showToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(null), 2800)
+  }
 
   const filtered = CLIENTS.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -82,7 +89,12 @@ export function ClientsPage() {
   const client = selectedIdx !== null ? CLIENTS[selectedIdx] : null
 
   return (
-    <div className="flex h-full overflow-hidden" style={{ animation: 'bosUp 0.35s ease both' }}>
+    <div className="flex h-full overflow-hidden relative" style={{ animation: 'bosUp 0.35s ease both' }}>
+      {toast && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 bg-ink text-white text-[13px] font-semibold px-5 py-3 rounded-[12px] shadow-lg" style={{ animation: 'bosUp 0.25s ease both' }}>
+          {toast}
+        </div>
+      )}
 
       {/* ── Left: client list ── */}
       <div className={cn(
@@ -229,12 +241,20 @@ function ClientDetail({ client: c, onBack }: { client: Client; onBack: () => voi
           </div>
 
           <div className="flex gap-[9px]">
-            <button className="flex-1 bg-plum text-white border-none h-[46px] rounded-[14px] text-[13.5px] font-bold cursor-pointer hover:opacity-90 transition-opacity">
+            <button
+              className="flex-1 bg-plum text-white border-none h-[46px] rounded-[14px] text-[13.5px] font-bold cursor-pointer hover:opacity-90 transition-opacity"
+              onClick={() => onNavigate('chat')}
+            >
               Book appointment
             </button>
-            <button className="flex-none bg-plum-soft text-plum border-none h-[46px] px-[20px] rounded-[14px] text-[13.5px] font-semibold cursor-pointer hover:opacity-80 transition-opacity">
+            <a
+              href={`https://wa.me/${(client?.phone ?? '').replace(/\s+/g, '').replace(/^\+/, '')}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex-none bg-plum-soft text-plum no-underline h-[46px] px-[20px] rounded-[14px] text-[13.5px] font-semibold cursor-pointer hover:opacity-80 transition-opacity flex items-center"
+            >
               Message
-            </button>
+            </a>
           </div>
         </div>
 

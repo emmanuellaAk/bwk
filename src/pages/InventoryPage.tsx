@@ -59,6 +59,12 @@ interface Props {
 
 export function InventoryPage({ onNavigate }: Props) {
   const [search, setSearch] = useState('')
+  const [toast, setToast]   = useState<string | null>(null)
+
+  const showToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(null), 2800)
+  }
 
   const totalPacks = STOCK.reduce((s, i) => s + i.packs, 0)
   const stockValue = STOCK.reduce((s, i) => s + i.packs * i.pricePerPack, 0)
@@ -69,7 +75,12 @@ export function InventoryPage({ onNavigate }: Props) {
   )
 
   return (
-    <div className="p-6 h-full overflow-y-auto bos-scroll" style={{ animation: 'bosUp 0.35s ease both' }}>
+    <div className="p-6 h-full overflow-y-auto bos-scroll relative" style={{ animation: 'bosUp 0.35s ease both' }}>
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-ink text-white text-[13px] font-semibold px-5 py-3 rounded-[14px] shadow-lg" style={{ animation: 'bosUp 0.25s ease both' }}>
+          {toast}
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
@@ -162,7 +173,10 @@ export function InventoryPage({ onNavigate }: Props) {
             )}
           </div>
 
-          <button className="mt-4 w-full flex items-center justify-center gap-2 bg-plum-soft text-plum border border-dashed border-plum/25 h-[48px] rounded-[14px] font-bold text-[13.5px] cursor-pointer hover:opacity-85 transition-opacity">
+          <button
+            className="mt-4 w-full flex items-center justify-center gap-2 bg-plum-soft text-plum border border-dashed border-plum/25 h-[48px] rounded-[14px] font-bold text-[13.5px] cursor-pointer hover:opacity-85 transition-opacity"
+            onClick={() => showToast('Stock update logged ✓')}
+          >
             <PlusIcon /> Add stock / log purchase
           </button>
         </div>
@@ -187,7 +201,10 @@ export function InventoryPage({ onNavigate }: Props) {
                       <div className="font-bold text-[13px] text-ink truncate">{it.color} · {it.length}</div>
                       <div className="text-[11px] text-draft font-semibold mt-[1px]">{it.packs} pack{it.packs !== 1 ? 's' : ''} left</div>
                     </div>
-                    <button className="bg-plum text-white border-none h-[32px] px-[12px] rounded-[9px] text-[11.5px] font-bold cursor-pointer flex-none hover:opacity-90 transition-opacity">
+                    <button
+                      className="bg-plum text-white border-none h-[32px] px-[12px] rounded-[9px] text-[11.5px] font-bold cursor-pointer flex-none hover:opacity-90 transition-opacity"
+                      onClick={() => showToast(`Reorder placed for ${it.color} ${it.length} ✓`)}
+                    >
                       Reorder
                     </button>
                   </div>

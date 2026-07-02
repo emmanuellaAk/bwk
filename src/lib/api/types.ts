@@ -33,8 +33,15 @@ export interface Nudge {
   acted: boolean
 }
 
+export interface EarningsChunk {
+  delta: string; revenue: string; expenses: string; completed: number; profit: string
+}
+export interface AvailChunk { title: string; body: string }
+
 export interface StreamChunk {
   token?: string
   booking?: Booking
+  earnings?: EarningsChunk
+  avail?: AvailChunk
   done?: boolean
 }

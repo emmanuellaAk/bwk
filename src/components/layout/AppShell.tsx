@@ -10,7 +10,7 @@ const SIDEBAR_NAV = [
   { id: 'home' as Tab,     label: 'Dashboard', Icon: LayoutDashboard, badge: null },
   { id: 'calendar' as Tab, label: 'Calendar',  Icon: Calendar,       badge: '3' },
   { id: 'clients' as Tab,  label: 'Clients',   Icon: Users,          badge: null },
-  { id: 'inventory' as Tab,label: 'Inventory', Icon: Package,        badge: '2' },
+  { id: 'inventory' as Tab,label: 'Inventory', Icon: Package,        badge: '3' },
   { id: 'suppliers' as Tab,label: 'Suppliers', Icon: Truck,          badge: null },
   { id: 'finance' as Tab,  label: 'Finance',   Icon: BarChart2,      badge: null },
 ]
@@ -20,8 +20,8 @@ const HEADER: Record<string, { title: string; sub: string }> = {
   home:      { title: 'Dashboard',  sub: "Today's overview" },
   calendar:  { title: 'Calendar',   sub: 'July 2026' },
   clients:   { title: 'Customers',  sub: '48 total' },
-  inventory: { title: 'Inventory',  sub: '18 items · 2 low' },
-  suppliers: { title: 'Suppliers',  sub: '2 partners' },
+  inventory: { title: 'Inventory',  sub: '10 items · 3 low' },
+  suppliers: { title: 'Suppliers',  sub: '3 partners' },
   finance:   { title: 'Finance',    sub: 'This month' },
 }
 
@@ -35,10 +35,11 @@ const TODAY_APPTS = [
 interface AppShellProps {
   activeTab: Tab
   onTabChange: (tab: Tab) => void
+  onOpenPortal: () => void
   children: React.ReactNode
 }
 
-export function AppShell({ activeTab, onTabChange, children }: AppShellProps) {
+export function AppShell({ activeTab, onTabChange, onOpenPortal, children }: AppShellProps) {
   const { title, sub } = HEADER[activeTab] ?? HEADER.chat
   const isChat = activeTab === 'chat'
 
@@ -87,7 +88,7 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps) {
 
         {/* Bottom */}
         <div className="mt-auto flex flex-col gap-2">
-          <button className="flex items-center gap-[10px] px-[13px] py-[11px] border border-dashed border-line bg-transparent rounded-[13px] cursor-pointer text-ink text-[13px] font-semibold w-full hover:bg-surface-2 transition-colors">
+          <button onClick={onOpenPortal} className="flex items-center gap-[10px] px-[13px] py-[11px] border border-dashed border-line bg-transparent rounded-[13px] cursor-pointer text-ink text-[13px] font-semibold w-full hover:bg-surface-2 transition-colors">
             <ExternalLink size={17} strokeWidth={2} />
             <span className="flex-1 text-left">Booking page</span>
           </button>
@@ -120,7 +121,7 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps) {
               <div className="text-[11.5px] text-muted font-medium mt-0.5">{sub}</div>
             </div>
           </div>
-          <button className="flex items-center gap-[7px] bg-plum text-white h-[38px] px-[15px] rounded-[12px] text-[12.5px] font-semibold cursor-pointer border-none hover:opacity-90 transition-opacity">
+          <button onClick={onOpenPortal} className="flex items-center gap-[7px] bg-plum text-white h-[38px] px-[15px] rounded-[12px] text-[12.5px] font-semibold cursor-pointer border-none hover:opacity-90 transition-opacity">
             <ExternalLink size={14} strokeWidth={2.2} />
             <span>Booking link</span>
           </button>
@@ -128,7 +129,7 @@ export function AppShell({ activeTab, onTabChange, children }: AppShellProps) {
 
         {/* Body: content + optional right panel */}
         <div className="flex flex-1 min-h-0">
-          <main className={cn('flex-1 min-w-0 overflow-y-auto bos-scroll', isChat && 'flex flex-col')}>
+          <main className={cn('flex-1 min-w-0 flex flex-col overflow-hidden', isChat && 'flex flex-col')}>
             {children}
           </main>
 
