@@ -10,7 +10,7 @@ from app.errors import AppError, app_error_handler, validation_error_handler, un
 from app.logger import log, setup_logging
 from app.middleware.request_id import RequestIDMiddleware
 from app.middleware.logging import LoggingMiddleware
-from app.routers import health, auth
+from app.routers import health, auth, clients, services
 
 
 @asynccontextmanager
@@ -60,9 +60,11 @@ app.add_exception_handler(Exception, unhandled_error_handler)
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(health.router, prefix="/v1")
-app.include_router(auth.router,   prefix="/v1")
+app.include_router(auth.router,     prefix="/v1")
+app.include_router(clients.router,  prefix="/v1")
+app.include_router(services.router, prefix="/v1")
 
-# Sprints 3–8 routers go here:
+# Sprints 4–8 routers go here:
 # app.include_router(clients.router,      prefix="/v1/clients")
 # app.include_router(appointments.router, prefix="/v1/appointments")
 # app.include_router(finance.router,      prefix="/v1/finance")
