@@ -10,7 +10,7 @@ from app.errors import AppError, app_error_handler, validation_error_handler, un
 from app.logger import log, setup_logging
 from app.middleware.request_id import RequestIDMiddleware
 from app.middleware.logging import LoggingMiddleware
-from app.routers import health, auth, clients, services, appointments
+from app.routers import health, auth, clients, services, appointments, finance, chat
 
 
 @asynccontextmanager
@@ -42,7 +42,7 @@ app.add_middleware(LoggingMiddleware)
 # CORS — restrict to the frontend origin
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.cors_origin],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
@@ -64,6 +64,8 @@ app.include_router(auth.router,     prefix="/v1")
 app.include_router(clients.router,  prefix="/v1")
 app.include_router(services.router,      prefix="/v1")
 app.include_router(appointments.router,  prefix="/v1")
+app.include_router(finance.router,       prefix="/v1")
+app.include_router(chat.router,          prefix="/v1")
 
 # Sprints 5–8 routers go here:
 # app.include_router(clients.router,      prefix="/v1/clients")

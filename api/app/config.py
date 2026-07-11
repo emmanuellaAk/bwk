@@ -13,7 +13,12 @@ class Settings(BaseSettings):
     port: int = 8000
     database_url: str
     jwt_secret: str
-    cors_origin: str
+    cors_origin: str  # comma-separated list of allowed origins
+    anthropic_api_key: str = ""
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return [o.strip() for o in self.cors_origin.split(",") if o.strip()]
 
     @field_validator("jwt_secret")
     @classmethod

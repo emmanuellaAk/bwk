@@ -1,8 +1,8 @@
-import type { Booking, BookingDraft, Nudge, StreamChunk } from './types'
+import type { Booking, BookingDraft, Nudge, StreamChunk, ChatEntry } from './types'
 
 export interface ApiClient {
-  /** Stream a response to a user message, yielding token chunks + optional booking card */
-  streamMessage(text: string): AsyncIterable<StreamChunk>
+  /** Stream a response to a user message. History is prior messages for context. */
+  streamMessage(text: string, history: readonly ChatEntry[]): AsyncIterable<StreamChunk>
 
   /** Confirm a DRAFT booking → returns CONFIRMED booking */
   confirmBooking(bookingId: string, draft: BookingDraft): Promise<Booking>

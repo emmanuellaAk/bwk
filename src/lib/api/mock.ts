@@ -111,7 +111,7 @@ const RESPONSES: Record<string, string> = {
 }
 
 export const mockClient: ApiClient = {
-  async *streamMessage(text) {
+  async *streamMessage(text, _history = []) {
     const lower = text.toLowerCase()
     const intent = classify(text)
 

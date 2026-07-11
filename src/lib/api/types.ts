@@ -38,6 +38,13 @@ export interface EarningsChunk {
 }
 export interface AvailChunk { title: string; body: string }
 
+export interface ChatEntry {
+  id: string
+  role: 'user' | 'assistant'
+  text: string
+  streaming?: boolean
+}
+
 export interface StreamChunk {
   token?: string
   booking?: Booking

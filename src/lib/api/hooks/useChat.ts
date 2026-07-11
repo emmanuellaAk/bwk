@@ -1,18 +1,16 @@
 import { useState, useCallback } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { apiClient } from '../client'
-import type { Booking, BookingDraft } from '../types'
+import type { Booking, BookingDraft, ChatEntry } from '../types'
+
+export type { ChatEntry }
 
 export interface EarningsData {
   delta: string; revenue: string; expenses: string; completed: number; profit: string
 }
 export interface AvailData { title: string; body: string }
 
-export interface ChatEntry {
-  id: string
-  role: 'user' | 'assistant'
-  text: string
-  streaming?: boolean
+export interface ChatMessage extends ChatEntry {
   booking?: Booking
   earnings?: EarningsData
   avail?: AvailData
@@ -24,24 +22,25 @@ function nextId(role: 'u' | 'a') {
 }
 
 export function useChat() {
-  const [messages, setMessages] = useState<ChatEntry[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
 
   const { mutate: sendMessage, isPending } = useMutation({
     mutationFn: async (text: string) => {
-      const userId = nextId('u')
-      const aiId = nextId('a')
+      const history = messages
+      const userId  = nextId('u')
+      const aiId    = nextId('a')
 
       setMessages(prev => [
         ...prev,
-        { id: userId, role: 'user', text },
-        { id: aiId, role: 'assistant', text: '', streaming: true },
+        { id: userId, role: 'user',      text },
+        { id: aiId,   role: 'assistant', text: '', streaming: true },
       ])
 
-      let pendingBooking: Booking | undefined
-      let pendingEarnings: ChatEntry['earnings'] | undefined
-      let pendingAvail:    ChatEntry['avail']    | undefined
+      let pendingBooking:  Booking             | undefined
+      let pendingEarnings: ChatMessage['earnings'] | undefined
+      let pendingAvail:    ChatMessage['avail']    | undefined
 
-      for await (const chunk of apiClient.streamMessage(text)) {
+      for await (const chunk of apiClient.streamMessage(text, history)) {
         if (chunk.token !== undefined) {
           const token = chunk.token
           setMessages(prev =>
