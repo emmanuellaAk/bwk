@@ -1,17 +1,17 @@
 import { useState } from 'react'
 import { colorHex, cedi } from '@/lib/braider'
 import { cn } from '@/lib/utils'
+import { useInventory, useRestockItem, type StockItemRecord } from '@/lib/api/hooks/useInventory'
+import { tokenStore } from '@/lib/api/token'
 import type { Tab } from '@/components/layout/BottomNav'
 
-interface StockItem {
-  color: string
-  length: string
-  packs: number
-  maxPacks: number
-  pricePerPack: number
+// ── Demo fallback ─────────────────────────────────────────────────────────────
+
+interface DemoItem {
+  color: string; length: string; packs: number; maxPacks: number; pricePerPack: number
 }
 
-const STOCK: StockItem[] = [
+const DEMO_STOCK: DemoItem[] = [
   { color: 'Natural Black', length: '20″', packs: 24, maxPacks: 30, pricePerPack: 28 },
   { color: 'Natural Black', length: '18″', packs: 6,  maxPacks: 30, pricePerPack: 24 },
   { color: 'Natural Black', length: '16″', packs: 8,  maxPacks: 30, pricePerPack: 20 },
@@ -24,23 +24,65 @@ const STOCK: StockItem[] = [
   { color: 'Copper',        length: '20″', packs: 5,  maxPacks: 15, pricePerPack: 32 },
 ]
 
-function stockStatus(packs: number): 'low' | 'ok' | 'good' {
+// ── Stock status logic (mirrors backend) ──────────────────────────────────────
+
+type Status = 'low' | 'ok' | 'good'
+
+function stockStatus(packs: number): Status {
   if (packs <= 2) return 'low'
   if (packs <= 6) return 'ok'
   return 'good'
 }
 
-const STATUS_STYLE = {
-  low:  { text: 'Low stock', bg: 'bg-draft-bg',    color: 'text-draft'   },
-  ok:   { text: 'OK',        bg: 'bg-surface-2',   color: 'text-muted'   },
-  good: { text: 'In stock',  bg: 'bg-success-bg',  color: 'text-success' },
+const STATUS_STYLE: Record<Status, { text: string; bg: string; color: string }> = {
+  low:  { text: 'Low stock', bg: 'bg-draft-bg',   color: 'text-draft'   },
+  ok:   { text: 'OK',        bg: 'bg-surface-2',  color: 'text-muted'   },
+  good: { text: 'In stock',  bg: 'bg-success-bg', color: 'text-success' },
 }
 
-const BAR_COLOR = {
+const BAR_COLOR: Record<Status, string> = {
   low:  '#B5762A',
   ok:   '#8A7B80',
   good: '#2F7D5B',
 }
+
+// ── Unified row shape ─────────────────────────────────────────────────────────
+
+interface Row {
+  id: string | null
+  color: string
+  length: string
+  packs: number
+  maxPacks: number
+  pricePerPack: number
+  status: Status
+}
+
+function fromApi(item: StockItemRecord): Row {
+  return {
+    id: item.id,
+    color: item.color,
+    length: item.length,
+    packs: item.packs,
+    maxPacks: item.max_packs,
+    pricePerPack: item.price_per_pack,
+    status: item.status,
+  }
+}
+
+function fromDemo(item: DemoItem): Row {
+  return {
+    id: null,
+    color: item.color,
+    length: item.length,
+    packs: item.packs,
+    maxPacks: item.maxPacks,
+    pricePerPack: item.pricePerPack,
+    status: stockStatus(item.packs),
+  }
+}
+
+// ── Icons ─────────────────────────────────────────────────────────────────────
 
 const PlusIcon = () => (
   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
@@ -53,26 +95,48 @@ const ArrowRight = () => (
   </svg>
 )
 
-interface Props {
-  onNavigate: (tab: Tab) => void
-}
+// ── Component ─────────────────────────────────────────────────────────────────
+
+interface Props { onNavigate: (tab: Tab) => void }
 
 export function InventoryPage({ onNavigate }: Props) {
   const [search, setSearch] = useState('')
-  const [toast, setToast]   = useState<string | null>(null)
+  const [toast,  setToast]  = useState<string | null>(null)
+
+  const hasToken = !!tokenStore.get()
+  const { data: apiData, isLoading } = useInventory()
+  const restock = useRestockItem()
 
   const showToast = (msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(null), 2800)
   }
 
-  const totalPacks = STOCK.reduce((s, i) => s + i.packs, 0)
-  const stockValue = STOCK.reduce((s, i) => s + i.packs * i.pricePerPack, 0)
-  const lowItems   = STOCK.filter(i => stockStatus(i.packs) === 'low')
+  const isDemo = !hasToken
+  const rows: Row[] = isDemo
+    ? DEMO_STOCK.map(fromDemo)
+    : (apiData ?? []).map(fromApi)
 
-  const filtered = STOCK.filter(i =>
-    `${i.color} ${i.length}`.toLowerCase().includes(search.toLowerCase())
+  const totalPacks  = rows.reduce((s, r) => s + r.packs, 0)
+  const stockValue  = rows.reduce((s, r) => s + r.packs * r.pricePerPack, 0)
+  const lowItems    = rows.filter(r => r.status === 'low')
+
+  const filtered = rows.filter(r =>
+    `${r.color} ${r.length}`.toLowerCase().includes(search.toLowerCase())
   )
+
+  const handleReorder = async (row: Row) => {
+    if (isDemo || !row.id) {
+      showToast(`Reorder placed for ${row.color} ${row.length} ✓`)
+      return
+    }
+    try {
+      await restock.mutateAsync({ id: row.id, quantity: 10 })
+      showToast(`+10 packs restocked for ${row.color} ${row.length} ✓`)
+    } catch {
+      showToast('Restock failed — please try again')
+    }
+  }
 
   return (
     <div className="p-6 h-full overflow-y-auto bos-scroll relative" style={{ animation: 'bosUp 0.35s ease both' }}>
@@ -86,7 +150,9 @@ export function InventoryPage({ onNavigate }: Props) {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="font-serif font-medium text-[28px] leading-tight text-ink m-0">Inventory</h1>
-          <div className="text-[12px] text-muted font-semibold mt-1">{STOCK.length} extensions tracked</div>
+          <div className="text-[12px] text-muted font-semibold mt-1">
+            {rows.length} extensions tracked{isDemo ? ' · Demo data' : ''}
+          </div>
         </div>
         <button
           onClick={() => onNavigate('suppliers')}
@@ -96,12 +162,12 @@ export function InventoryPage({ onNavigate }: Props) {
         </button>
       </div>
 
-      {/* Row 1: 3 stat cards */}
+      {/* Stat cards */}
       <div className="grid grid-cols-3 gap-[10px] mb-6">
         <div className="bg-white border border-line rounded-[16px] p-[14px]">
           <div className="text-[10.5px] text-muted font-semibold">Total packs</div>
           <div className="font-serif font-bold text-[22px] text-ink mt-1">{totalPacks}</div>
-          <div className="text-[11px] text-muted font-semibold mt-[5px]">{STOCK.length} skus</div>
+          <div className="text-[11px] text-muted font-semibold mt-[5px]">{rows.length} skus</div>
         </div>
         <div className="bg-plum text-white rounded-[16px] p-[14px]">
           <div className="text-[10.5px] opacity-75 font-semibold">Stock value</div>
@@ -115,7 +181,7 @@ export function InventoryPage({ onNavigate }: Props) {
         </div>
       </div>
 
-      {/* Row 2: stock list (left) + sidebar (right) */}
+      {/* Body */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
 
         {/* Left: extensions list */}
@@ -135,43 +201,49 @@ export function InventoryPage({ onNavigate }: Props) {
             </div>
           </div>
 
-          <div className="flex flex-col gap-[9px]">
-            {filtered.map((it, i) => {
-              const hex    = colorHex(it.color)
-              const status = stockStatus(it.packs)
-              const st     = STATUS_STYLE[status]
-              const pct    = Math.round((it.packs / it.maxPacks) * 100)
-              return (
-                <div key={i} className="flex items-center gap-3 border border-line rounded-[14px] px-[14px] py-[13px] shadow-[0_1px_6px_rgba(110,27,58,0.04)]">
-                  <span
-                    className="w-[34px] h-[34px] rounded-[10px] border border-black/10 flex-none"
-                    style={{ background: hex }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-[7px]">
-                      <div className="font-bold text-[13.5px] text-ink">{it.color} · {it.length}</div>
-                      <span className={cn('text-[11px] font-bold px-[10px] py-[4px] rounded-[20px]', st.bg, st.color)}>
-                        {st.text}
-                      </span>
-                    </div>
-                    <div className="h-[6px] bg-surface-2 rounded-[4px] overflow-hidden">
-                      <div
-                        className="h-full rounded-[4px] transition-all"
-                        style={{ width: `${pct}%`, background: BAR_COLOR[status] }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between mt-[5px]">
-                      <div className="text-[10.5px] text-muted font-semibold">{it.packs} of {it.maxPacks} packs</div>
-                      <div className="text-[10.5px] text-muted font-semibold">{cedi(it.pricePerPack)}/pack</div>
+          {/* Loading skeletons */}
+          {hasToken && isLoading && (
+            <div className="flex flex-col gap-[9px]">
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} className="h-[76px] bg-surface-2 rounded-[14px] animate-pulse" />
+              ))}
+            </div>
+          )}
+
+          {!isLoading && (
+            <div className="flex flex-col gap-[9px]">
+              {filtered.map((row, i) => {
+                const hex = colorHex(row.color)
+                const st  = STATUS_STYLE[row.status]
+                const pct = Math.round((row.packs / row.maxPacks) * 100)
+                return (
+                  <div key={row.id ?? i} className="flex items-center gap-3 border border-line rounded-[14px] px-[14px] py-[13px] shadow-[0_1px_6px_rgba(110,27,58,0.04)]">
+                    <span className="w-[34px] h-[34px] rounded-[10px] border border-black/10 flex-none" style={{ background: hex }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-[7px]">
+                        <div className="font-bold text-[13.5px] text-ink">{row.color} · {row.length}</div>
+                        <span className={cn('text-[11px] font-bold px-[10px] py-[4px] rounded-[20px]', st.bg, st.color)}>
+                          {st.text}
+                        </span>
+                      </div>
+                      <div className="h-[6px] bg-surface-2 rounded-[4px] overflow-hidden">
+                        <div className="h-full rounded-[4px] transition-all" style={{ width: `${pct}%`, background: BAR_COLOR[row.status] }} />
+                      </div>
+                      <div className="flex items-center justify-between mt-[5px]">
+                        <div className="text-[10.5px] text-muted font-semibold">{row.packs} of {row.maxPacks} packs</div>
+                        <div className="text-[10.5px] text-muted font-semibold">{cedi(row.pricePerPack)}/pack</div>
+                      </div>
                     </div>
                   </div>
+                )
+              })}
+              {filtered.length === 0 && !isLoading && (
+                <div className="text-center py-8 text-muted text-[13px]">
+                  {hasToken && rows.length === 0 ? 'No stock items yet — add your first item below' : 'No items match'}
                 </div>
-              )
-            })}
-            {filtered.length === 0 && (
-              <div className="text-center py-8 text-muted text-[13px]">No items match</div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           <button
             className="mt-4 w-full flex items-center justify-center gap-2 bg-plum-soft text-plum border border-dashed border-plum/25 h-[48px] rounded-[14px] font-bold text-[13.5px] cursor-pointer hover:opacity-85 transition-opacity"
@@ -181,29 +253,26 @@ export function InventoryPage({ onNavigate }: Props) {
           </button>
         </div>
 
-        {/* Right: low stock + recent purchases */}
+        {/* Right sidebar */}
         <div className="flex flex-col gap-4">
 
-          {/* Low stock reorder queue */}
+          {/* Reorder queue */}
           <div className="bg-white border border-line rounded-[18px] p-5">
             <h3 className="font-bold text-[14px] text-ink m-0 mb-3">Reorder queue</h3>
             {lowItems.length === 0 ? (
               <div className="text-center py-4 text-muted text-[12.5px]">All stocked up ✓</div>
             ) : (
               <div className="flex flex-col gap-[9px]">
-                {lowItems.map((it, i) => (
-                  <div key={i} className="flex items-center gap-3 bg-draft-bg rounded-[13px] px-[13px] py-[11px]">
-                    <span
-                      className="w-[10px] h-[10px] rounded-full border border-black/10 flex-none"
-                      style={{ background: colorHex(it.color) }}
-                    />
+                {lowItems.map((row, i) => (
+                  <div key={row.id ?? i} className="flex items-center gap-3 bg-draft-bg rounded-[13px] px-[13px] py-[11px]">
+                    <span className="w-[10px] h-[10px] rounded-full border border-black/10 flex-none" style={{ background: colorHex(row.color) }} />
                     <div className="flex-1 min-w-0">
-                      <div className="font-bold text-[13px] text-ink truncate">{it.color} · {it.length}</div>
-                      <div className="text-[11px] text-draft font-semibold mt-[1px]">{it.packs} pack{it.packs !== 1 ? 's' : ''} left</div>
+                      <div className="font-bold text-[13px] text-ink truncate">{row.color} · {row.length}</div>
+                      <div className="text-[11px] text-draft font-semibold mt-[1px]">{row.packs} pack{row.packs !== 1 ? 's' : ''} left</div>
                     </div>
                     <button
                       className="bg-plum text-white border-none h-[32px] px-[12px] rounded-[9px] text-[11.5px] font-bold cursor-pointer flex-none hover:opacity-90 transition-opacity"
-                      onClick={() => showToast(`Reorder placed for ${it.color} ${it.length} ✓`)}
+                      onClick={() => void handleReorder(row)}
                     >
                       Reorder
                     </button>
@@ -213,7 +282,7 @@ export function InventoryPage({ onNavigate }: Props) {
             )}
           </div>
 
-          {/* Recent purchases */}
+          {/* Recent purchases — demo only for now */}
           <div className="bg-white border border-line rounded-[18px] p-5">
             <h3 className="font-bold text-[14px] text-ink m-0 mb-3">Recent purchases</h3>
             <div className="flex flex-col gap-[10px]">
@@ -235,7 +304,6 @@ export function InventoryPage({ onNavigate }: Props) {
             </div>
           </div>
 
-          {/* Go to suppliers CTA */}
           <button
             onClick={() => onNavigate('suppliers')}
             className="w-full bg-plum text-white border-none h-[48px] rounded-[14px] font-bold text-[13.5px] cursor-pointer hover:opacity-90 transition-opacity"
