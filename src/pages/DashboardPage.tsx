@@ -5,7 +5,6 @@ import { useAppointments } from '@/lib/api/hooks/useAppointments'
 import { tokenStore } from '@/lib/api/token'
 import type { AppointmentRecord } from '@/lib/api/hooks/useAppointments'
 import type { Tab } from '@/components/layout/BottomNav'
-import type { BookingRecord } from '@/lib/types'
 
 const EARN_STATS = [
   { label: 'Today',       value: 'GH₵620',   delta: '2 appointments done', up: true  },
@@ -47,11 +46,9 @@ function fmtApptTime(isoStr: string): { t: string; ap: string } {
 
 interface Props {
   onNavigate: (tab: Tab) => void
-  bookings:   BookingRecord[]
 }
 
-export function DashboardPage({ onNavigate, bookings }: Props) {
-  const newToday = bookings.filter(b => b.dayIdx === 1)
+export function DashboardPage({ onNavigate }: Props) {
   const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
 
   const todayStart = useMemo(() => {
@@ -70,7 +67,7 @@ export function DashboardPage({ onNavigate, bookings }: Props) {
   const showApi  = hasToken && !apptLoading
 
   const apiAppts: AppointmentRecord[] = todayAppts ?? []
-  const totalCount = (showApi ? apiAppts.length : DEMO_APPOINTMENTS.length) + newToday.length
+  const totalCount = showApi ? apiAppts.length : DEMO_APPOINTMENTS.length
 
   return (
     <div className="p-6 h-full overflow-y-auto bos-scroll" style={{ animation: 'bosUp 0.35s ease both' }}>
@@ -124,38 +121,6 @@ export function DashboardPage({ onNavigate, bookings }: Props) {
           </div>
 
           <div className="flex flex-col gap-[9px]">
-            {/* Portal new bookings — always shown */}
-            {newToday.map(b => {
-              const hex = colorHex(b.color)
-              const bal = b.price - b.deposit
-              const [t, ap] = b.time.split(' ')
-              return (
-                <div
-                  key={b.id}
-                  className="bg-plum-soft border border-plum/20 rounded-[16px] p-[14px_16px] flex items-center gap-4 shadow-[0_1px_6px_rgba(110,27,58,0.07)] cursor-pointer"
-                >
-                  <div className="text-center flex-none w-[46px]">
-                    <div className="font-serif font-bold text-[15px] text-ink leading-none">{t}</div>
-                    <div className="text-[10px] text-muted font-semibold mt-[3px]">{ap}</div>
-                  </div>
-                  <div className="w-px self-stretch bg-plum/20 flex-none" />
-                  <span className="w-[40px] h-[40px] rounded-[12px] flex items-center justify-center text-white font-bold text-[14px] font-serif flex-none" style={{ background: hex }}>
-                    {initials(b.name)}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold text-[14px] text-ink leading-tight">{b.name}</div>
-                    <div className="text-[12px] text-muted mt-[3px]">{b.service} · {b.color}</div>
-                  </div>
-                  <div className="text-right flex-none">
-                    <div className="font-bold text-[14px] text-ink">{cedi(b.price)}</div>
-                    <span className="inline-block text-[10.5px] font-bold px-[9px] py-[4px] rounded-[20px] mt-[4px] bg-draft-bg text-draft">
-                      {cedi(bal)} due
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
-
             {/* Loading skeleton */}
             {hasToken && apptLoading && [1, 2, 3].map(i => (
               <div key={i} className="h-[72px] bg-surface-2 rounded-[16px] animate-pulse" />
@@ -242,7 +207,7 @@ export function DashboardPage({ onNavigate, bookings }: Props) {
             })}
 
             {/* Empty state when logged in but no appointments today */}
-            {showApi && apiAppts.length === 0 && newToday.length === 0 && (
+            {showApi && apiAppts.length === 0 && (
               <div className="flex flex-col items-center justify-center py-10 text-center gap-2 bg-surface-2 rounded-[16px]">
                 <div className="text-[28px]">🗓️</div>
                 <div className="text-[13px] font-semibold text-ink">No appointments today</div>

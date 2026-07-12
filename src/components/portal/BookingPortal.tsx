@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { colorHex } from '@/lib/braider'
 import { cn } from '@/lib/utils'
-import type { BookingRecord } from '@/lib/types'
+import { api, ApiError } from '@/lib/api/base'
+import { salonStore } from '@/lib/api/salon'
 
 interface Service { name: string; desc: string; price: number; deposit: number }
-interface DateOpt  { dow: string; day: string; label: string; dayIdx: number }
+interface DateOpt  { dow: string; day: string; label: string; isoDate: string; dayIdx: number }
 interface ColorOpt { name: string; hex: string }
 
 const SERVICES: Service[] = [
@@ -16,15 +18,32 @@ const SERVICES: Service[] = [
   { name: 'Fulani Braids',             desc: 'With accessories · 5–6 hrs', price: 380, deposit: 114 },
 ]
 
-/* Dates aligned to the app's calendar week (Mon Jul 13 – Sat Jul 18) */
-const DATES: DateOpt[] = [
-  { dow: 'MON', day: '13', label: 'Mon, Jul 13', dayIdx: 0 },
-  { dow: 'TUE', day: '14', label: 'Tue, Jul 14', dayIdx: 1 },
-  { dow: 'WED', day: '15', label: 'Wed, Jul 15', dayIdx: 2 },
-  { dow: 'THU', day: '16', label: 'Thu, Jul 16', dayIdx: 3 },
-  { dow: 'FRI', day: '17', label: 'Fri, Jul 17', dayIdx: 4 },
-  { dow: 'SAT', day: '18', label: 'Sat, Jul 18', dayIdx: 5 },
-]
+function getPortalDates(): DateOpt[] {
+  const DAYS = ['SUN','MON','TUE','WED','THU','FRI','SAT'] as const
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] as const
+  const dates: DateOpt[] = []
+  const d = new Date()
+  d.setDate(d.getDate() + 1) // start from tomorrow
+  d.setHours(0, 0, 0, 0)
+  let idx = 0
+  while (dates.length < 6) {
+    const dow = d.getDay()
+    if (dow !== 0) { // skip Sunday
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      dates.push({
+        dow: DAYS[dow],
+        day: String(d.getDate()),
+        label: `${DAYS[dow][0]}${DAYS[dow].slice(1).toLowerCase()}, ${MONTHS[d.getMonth()]} ${d.getDate()}`,
+        isoDate: iso,
+        dayIdx: idx++,
+      })
+    }
+    d.setDate(d.getDate() + 1)
+  }
+  return dates
+}
+
+const DATES = getPortalDates()
 
 const TIMES = ['9:00 AM', '11:00 AM', '2:00 PM', '4:30 PM']
 
@@ -74,19 +93,21 @@ const CheckIcon = () => (
 
 interface Props {
   onClose: () => void
-  onBook:  (b: BookingRecord) => void
 }
 
-export function BookingPortal({ onClose, onBook }: Props) {
-  const [step,    setStep]    = useState(0)
-  const [name,    setName]    = useState('')
-  const [phone,   setPhone]   = useState('')
-  const [service, setService] = useState<Service | null>(null)
-  const [date,    setDate]    = useState<DateOpt | null>(null)
-  const [time,    setTime]    = useState<string | null>(null)
-  const [color,   setColor]   = useState<ColorOpt | null>(null)
-  const [photo,   setPhoto]   = useState(false)
-  const [done,    setDone]    = useState(false)
+export function BookingPortal({ onClose }: Props) {
+  const qc = useQueryClient()
+  const [step,       setStep]       = useState(0)
+  const [name,       setName]       = useState('')
+  const [phone,      setPhone]      = useState('')
+  const [service,    setService]    = useState<Service | null>(null)
+  const [date,       setDate]       = useState<DateOpt | null>(null)
+  const [time,       setTime]       = useState<string | null>(null)
+  const [color,      setColor]      = useState<ColorOpt | null>(null)
+  const [photo,      setPhoto]      = useState(false)
+  const [done,       setDone]       = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [payError,   setPayError]   = useState('')
 
   const canNext = (): boolean => {
     if (step === 0) return name.trim().length > 1 && phone.trim().length > 6
@@ -94,7 +115,7 @@ export function BookingPortal({ onClose, onBook }: Props) {
     if (step === 2) return date !== null
     if (step === 3) return time !== null
     if (step === 4) return color !== null
-    if (step === 5) return true // photo optional
+    if (step === 5) return true
     return false
   }
 
@@ -104,27 +125,40 @@ export function BookingPortal({ onClose, onBook }: Props) {
     else onClose()
   }
 
-  const pay = () => {
+  const pay = async () => {
     if (!service || !date || !time || !color) return
-    const record: BookingRecord = {
-      id:      `bk-${Date.now()}`,
-      name:    name.trim(),
-      phone:   phone.trim(),
-      service: service.name,
-      price:   service.price,
-      deposit: service.deposit,
-      date:    date.label,
-      time,
-      color:   color.name,
-      dayIdx:  date.dayIdx,
+    const salonId = salonStore.get()
+    if (!salonId) {
+      setPayError('Session expired — please refresh and try again.')
+      return
     }
-    onBook(record)
-    setDone(true)
+    setSubmitting(true)
+    setPayError('')
+    try {
+      await api.post('/v1/public/bookings', {
+        salon_id:     salonId,
+        client_name:  name.trim(),
+        client_phone: phone.trim(),
+        service_name: service.name,
+        date:         date.isoDate,
+        time,
+        color_hex:    color.hex,
+        total_price:  service.price,
+        deposit:      service.deposit,
+      })
+      void qc.invalidateQueries({ queryKey: ['appointments'] })
+      setDone(true)
+    } catch (err) {
+      setPayError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const reset = () => {
     setStep(0); setName(''); setPhone(''); setService(null)
-    setDate(null); setTime(null); setColor(null); setPhoto(false); setDone(false)
+    setDate(null); setTime(null); setColor(null); setPhoto(false)
+    setDone(false); setPayError('')
   }
 
   const meta = STEP_META[step]
@@ -263,16 +297,16 @@ export function BookingPortal({ onClose, onBook }: Props) {
                 <div className="grid grid-cols-3 gap-[9px]">
                   {DATES.map(d => (
                     <button
-                      key={d.label}
+                      key={d.isoDate}
                       onClick={() => setDate(d)}
                       className={cn(
                         'flex flex-col items-center py-[12px] rounded-[14px] border cursor-pointer transition-all',
-                        date?.label === d.label ? 'border-plum bg-plum text-white' : 'border-line bg-white text-ink hover:border-plum/30'
+                        date?.isoDate === d.isoDate ? 'border-plum bg-plum text-white' : 'border-line bg-white text-ink hover:border-plum/30'
                       )}
                     >
                       <span className="text-[10px] font-semibold opacity-70">{d.dow}</span>
                       <span className="font-serif font-bold text-[20px] mt-[3px]">{d.day}</span>
-                      <span className="text-[9.5px] font-medium opacity-60 mt-[2px]">Jul</span>
+                      <span className="text-[9.5px] font-medium opacity-60 mt-[2px]">{d.label.split(', ')[1]?.split(' ')[0]}</span>
                     </button>
                   ))}
                 </div>
@@ -361,11 +395,20 @@ export function BookingPortal({ onClose, onBook }: Props) {
                       <div className="font-serif font-bold text-[22px] text-plum">{cedi(service.deposit)}</div>
                     </div>
                   </div>
+                  {payError && (
+                    <div className="text-[12px] text-draft bg-draft-bg rounded-[12px] px-[13px] py-[10px] mb-3 leading-snug">
+                      {payError}
+                    </div>
+                  )}
                   <button
-                    onClick={pay}
-                    className="w-full flex items-center justify-center gap-[9px] bg-plum text-white border-none h-[52px] rounded-[16px] font-bold text-[15px] cursor-pointer shadow-[0_6px_18px_rgba(110,27,58,0.3)] hover:opacity-90 transition-opacity"
+                    onClick={() => { void pay() }}
+                    disabled={submitting}
+                    className={cn(
+                      'w-full flex items-center justify-center gap-[9px] text-white border-none h-[52px] rounded-[16px] font-bold text-[15px] cursor-pointer shadow-[0_6px_18px_rgba(110,27,58,0.3)] transition-opacity',
+                      submitting ? 'bg-plum/60 cursor-not-allowed' : 'bg-plum hover:opacity-90'
+                    )}
                   >
-                    <CardIcon /> Pay {cedi(service.deposit)} deposit
+                    <CardIcon /> {submitting ? 'Processing…' : `Pay ${cedi(service.deposit)} deposit`}
                   </button>
                   <div className="text-center text-[11px] text-muted mt-[11px]">🔒 Secured by Mobile Money & card</div>
                 </div>

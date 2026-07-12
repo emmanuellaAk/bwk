@@ -3,7 +3,6 @@ import { cn } from '@/lib/utils'
 import { initials, colorHex, cedi } from '@/lib/braider'
 import { useAppointments } from '@/lib/api/hooks/useAppointments'
 import type { AppointmentRecord } from '@/lib/api/hooks/useAppointments'
-import type { BookingRecord } from '@/lib/types'
 
 type View = 'day' | 'week' | 'month'
 type Kind = 'confirmed' | 'available' | 'blocked'
@@ -84,7 +83,7 @@ const LEGEND: { label: string; kind: Kind }[] = [
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function CalendarPage({ bookings = [] }: { bookings?: BookingRecord[] }) {
+export function CalendarPage() {
   const [view, setView] = useState<View>('week')
   const [weekOffset, setWeekOffset] = useState(0)
   const [selectedDay, setSelectedDay] = useState(() => {
@@ -131,25 +130,7 @@ export function CalendarPage({ bookings = [] }: { bookings?: BookingRecord[] }) 
       .filter(e => e.dayIdx >= 0 && e.dayIdx <= 5)
   }, [apptData, weekStart])
 
-  // Portal bookings only apply to the current week
-  const liveEvents = useMemo(() =>
-    weekOffset === 0
-      ? bookings.map(b => ({
-          time:      b.time.replace(' AM', '').replace(' PM', ''),
-          name:      b.name,
-          style:     b.service,
-          kind:      'confirmed' as Kind,
-          dayIdx:    b.dayIdx,
-          colorHex:  colorHex(b.color),
-          initials:  initials(b.name),
-          isLive:    true,
-          isPending: false,
-        }))
-      : [],
-    [bookings, weekOffset]
-  )
-
-  const allEvents = useMemo(() => [...apiEvents, ...liveEvents], [apiEvents, liveEvents])
+  const allEvents = apiEvents
 
   const toggleFilter = (kind: Kind) => {
     setActiveFilters(prev => {

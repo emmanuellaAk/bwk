@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { api, toE164 } from '../base'
 import { tokenStore } from '../token'
+import { salonStore } from '../salon'
 
 interface TokenResponse { access_token: string }
 
@@ -12,6 +13,7 @@ export function useLogin(onSuccess: () => void) {
         password,
       })
       tokenStore.set(data.access_token)
+      salonStore.setFromToken(data.access_token)
     },
     onSuccess,
   })
@@ -26,6 +28,7 @@ export function useRegister(onSuccess: () => void) {
         salon_name,
       })
       tokenStore.set(data.access_token)
+      salonStore.setFromToken(data.access_token)
     },
     onSuccess,
   })
