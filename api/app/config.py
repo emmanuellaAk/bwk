@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     database_url: str
     jwt_secret: str
     cors_origin: str  # comma-separated list of allowed origins
-    anthropic_api_key: str = ""
+    gemini_api_key: str = ""
 
     @property
     def cors_origins(self) -> list[str]:
