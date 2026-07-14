@@ -299,6 +299,22 @@ export function DashboardPage({ onNavigate }: Props) {
             </div>
           </div>
 
+          {/* Quick links */}
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => onNavigate('services')}
+              className="bg-white border border-line rounded-[14px] py-3.25 text-[13px] font-semibold text-ink cursor-pointer hover:bg-surface-2 transition-colors flex items-center justify-center gap-1.5"
+            >
+              Services <ArrowRight />
+            </button>
+            <button
+              onClick={() => onNavigate('suppliers')}
+              className="bg-white border border-line rounded-[14px] py-3.25 text-[13px] font-semibold text-ink cursor-pointer hover:bg-surface-2 transition-colors flex items-center justify-center gap-1.5"
+            >
+              Suppliers <ArrowRight />
+            </button>
+          </div>
+
         </div>
       </div>
     </div>
