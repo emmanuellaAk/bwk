@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { initials, colorHex, cedi } from '@/lib/braider'
-import { useAppointments } from '@/lib/api/hooks/useAppointments'
-import type { AppointmentRecord } from '@/lib/api/hooks/useAppointments'
+import {
+  useAppointments,
+  useUpdateAppointmentStatus,
+  useCancelAppointment,
+} from '@/lib/api/hooks/useAppointments'
+import type { AppointmentRecord, AppointmentStatus } from '@/lib/api/hooks/useAppointments'
 
 type View = 'day' | 'week' | 'month'
 type Kind = 'confirmed' | 'available' | 'blocked'
@@ -55,14 +59,15 @@ function toCalEvent(a: AppointmentRecord, weekStart: Date) {
   const starts = new Date(a.starts_at)
   const dayIdx = Math.round((starts.getTime() - weekStart.getTime()) / 86400000)
   return {
-    time: fmtShortTime(a.starts_at),
-    name: a.client_name ?? 'Client',
-    style: a.service_name ?? a.notes ?? '',
-    kind: 'confirmed' as Kind,
+    id:        a.id,
+    status:    a.status,
+    time:      fmtShortTime(a.starts_at),
+    name:      a.client_name ?? 'Client',
+    style:     a.service_name ?? a.notes ?? '',
+    kind:      'confirmed' as Kind,
     dayIdx,
-    colorHex: a.color_hex,
-    initials: initials(a.client_name ?? '?'),
-    isLive: false,
+    colorHex:  a.color_hex,
+    initials:  initials(a.client_name ?? '?'),
     isPending: a.status === 'pending',
   }
 }
@@ -91,7 +96,38 @@ export function CalendarPage() {
     const idx = getTodayDayIdx(ws)
     return idx >= 0 ? idx : 0
   })
-  const [activeFilters, setActiveFilters] = useState<Set<Kind>>(new Set(['confirmed', 'available', 'blocked']))
+  const [activeFilters,  setActiveFilters]  = useState<Set<Kind>>(new Set(['confirmed', 'available', 'blocked']))
+  const [actionLoading,  setActionLoading]  = useState<string | null>(null)
+  const [confirmCancel,  setConfirmCancel]  = useState<string | null>(null)
+  const [toast,          setToast]          = useState<string | null>(null)
+
+  const updateStatus = useUpdateAppointmentStatus()
+  const cancelAppt   = useCancelAppointment()
+
+  const showToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(null), 2800)
+  }
+
+  const handleAction = async (id: string, status: AppointmentStatus) => {
+    setActionLoading(id)
+    try {
+      await updateStatus.mutateAsync({ id, status })
+      showToast(status === 'confirmed' ? 'Appointment confirmed' : 'Appointment marked complete')
+    } catch { showToast('Action failed — try again') }
+    finally { setActionLoading(null) }
+  }
+
+  const handleCancel = async (id: string) => {
+    if (confirmCancel !== id) { setConfirmCancel(id); return }
+    setActionLoading(id)
+    setConfirmCancel(null)
+    try {
+      await cancelAppt.mutateAsync(id)
+      showToast('Appointment cancelled')
+    } catch { showToast('Cancel failed — try again') }
+    finally { setActionLoading(null) }
+  }
 
   useEffect(() => {
     const ws = getWeekStart(weekOffset)
@@ -154,7 +190,12 @@ export function CalendarPage() {
     .reduce((s, a) => s + a.total_price, 0)
 
   return (
-    <div className="p-6 h-full overflow-y-auto bos-scroll" style={{ animation: 'bosUp 0.35s ease both' }}>
+    <div className="p-6 h-full overflow-y-auto bos-scroll relative" style={{ animation: 'bosUp 0.35s ease both' }}>
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-ink text-white text-[13px] font-semibold px-5 py-3 rounded-[14px] shadow-lg" style={{ animation: 'bosUp 0.25s ease both' }}>
+          {toast}
+        </div>
+      )}
 
       {/* Title + controls row */}
       <div className="flex items-center justify-between mb-6">
@@ -285,13 +326,15 @@ export function CalendarPage() {
           ) : (
             <div className="flex flex-col gap-[10px]">
               {visibleEvents.map((e, i) => {
-                const s = KIND[e.kind]
+                const s        = KIND[e.kind]
+                const isActing = actionLoading === e.id
+                const needsAction = e.status === 'pending' || e.status === 'confirmed'
                 return (
                   <div key={i} className="flex gap-[11px] items-stretch">
                     <div className="w-[48px] flex-none text-right text-[11.5px] font-bold text-muted pt-[12px] shrink-0">
                       {e.time}
                     </div>
-                    <div className={cn('flex-1 border-l-[3px] rounded-[12px] py-[11px] px-[13px] cursor-pointer hover:brightness-95 transition-all', s.bg, s.bar)}>
+                    <div className={cn('flex-1 border-l-[3px] rounded-[12px] py-[11px] px-[13px] transition-all', s.bg, s.bar)}>
                       <div className="flex items-center gap-2">
                         <span
                           className="w-[22px] h-[22px] rounded-[7px] flex items-center justify-center text-white font-bold text-[8px] font-serif flex-none"
@@ -299,11 +342,63 @@ export function CalendarPage() {
                         >
                           {e.initials}
                         </span>
-                        <div className={cn('font-bold text-[13.5px]', s.nameColor)}>{e.name}</div>
-                        {e.isLive && <span className="text-[9px] font-bold bg-plum text-white px-[6px] py-[2px] rounded-full">NEW</span>}
-                        {e.isPending && <span className="text-[9px] font-bold bg-draft-bg text-draft px-[6px] py-[2px] rounded-full">PENDING</span>}
+                        <div className={cn('font-bold text-[13.5px] flex-1', s.nameColor)}>{e.name}</div>
+                        {e.isPending    && <span className="text-[9px] font-bold bg-draft-bg text-draft px-[6px] py-[2px] rounded-full">PENDING</span>}
+                        {e.status === 'completed' && <span className="text-[9px] font-bold bg-success-bg text-success px-[6px] py-[2px] rounded-full">DONE</span>}
                       </div>
-                      <div className={cn('text-[11.5px] mt-[2px] font-medium', s.text)}>{e.style}</div>
+                      {e.style && <div className={cn('text-[11.5px] mt-[2px] font-medium', s.text)}>{e.style}</div>}
+
+                      {/* Action row */}
+                      {needsAction && (
+                        <div className="flex items-center gap-2 mt-[9px]">
+                          {confirmCancel === e.id ? (
+                            <>
+                              <span className="text-[11.5px] text-draft font-semibold">Cancel appointment?</span>
+                              <button
+                                onClick={() => void handleCancel(e.id)}
+                                disabled={isActing}
+                                className="h-[26px] px-[10px] bg-draft text-white rounded-[8px] text-[11px] font-bold border-none cursor-pointer hover:opacity-90 disabled:opacity-50"
+                              >
+                                Yes
+                              </button>
+                              <button
+                                onClick={() => setConfirmCancel(null)}
+                                className="h-[26px] px-[10px] bg-surface-2 text-ink border border-line rounded-[8px] text-[11px] font-bold cursor-pointer hover:bg-white"
+                              >
+                                No
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              {e.status === 'pending' && (
+                                <button
+                                  onClick={() => void handleAction(e.id, 'confirmed')}
+                                  disabled={isActing}
+                                  className="h-[26px] px-[10px] bg-plum text-white rounded-[8px] text-[11px] font-bold border-none cursor-pointer hover:opacity-90 disabled:opacity-50"
+                                >
+                                  {isActing ? '…' : 'Confirm'}
+                                </button>
+                              )}
+                              {e.status === 'confirmed' && (
+                                <button
+                                  onClick={() => void handleAction(e.id, 'completed')}
+                                  disabled={isActing}
+                                  className="h-[26px] px-[10px] bg-success text-white rounded-[8px] text-[11px] font-bold border-none cursor-pointer hover:opacity-90 disabled:opacity-50"
+                                >
+                                  {isActing ? '…' : 'Complete'}
+                                </button>
+                              )}
+                              <button
+                                onClick={() => void handleCancel(e.id)}
+                                disabled={isActing}
+                                className="h-[26px] px-[8px] bg-transparent text-draft text-[11px] font-semibold border-none cursor-pointer hover:underline disabled:opacity-50"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )
