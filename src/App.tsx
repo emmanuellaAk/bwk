@@ -9,6 +9,7 @@ import { DashboardPage } from '@/pages/DashboardPage'
 import { InventoryPage } from '@/pages/InventoryPage'
 import { SuppliersPage } from '@/pages/SuppliersPage'
 import { ServicesPage } from '@/pages/ServicesPage'
+import { SettingsPage } from '@/pages/SettingsPage'
 import { BookingPortal } from '@/components/portal/BookingPortal'
 import { LoginPage } from '@/pages/LoginPage'
 import type { Tab } from '@/components/layout/BottomNav'
@@ -33,6 +34,7 @@ function BraiderOS() {
         {tab === 'inventory' && <InventoryPage onNavigate={setTab} />}
         {tab === 'suppliers' && <SuppliersPage />}
         {tab === 'services'  && <ServicesPage />}
+        {tab === 'settings'  && <SettingsPage />}
       </AppShell>
       {portal && <BookingPortal onClose={() => setPortal(false)} />}
     </>

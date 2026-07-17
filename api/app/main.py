@@ -10,7 +10,7 @@ from app.errors import AppError, app_error_handler, validation_error_handler, un
 from app.logger import log, setup_logging
 from app.middleware.request_id import RequestIDMiddleware
 from app.middleware.logging import LoggingMiddleware
-from app.routers import health, auth, clients, services, appointments, finance, chat, public, inventory, suppliers
+from app.routers import health, auth, clients, services, appointments, finance, chat, public, inventory, suppliers, settings
 
 
 @asynccontextmanager
@@ -69,6 +69,7 @@ app.include_router(chat.router,          prefix="/v1")
 app.include_router(public.router,        prefix="/v1")
 app.include_router(inventory.router,     prefix="/v1")
 app.include_router(suppliers.router,     prefix="/v1")
+app.include_router(settings.router,      prefix="/v1")
 
 # Sprints 5–8 routers go here:
 # app.include_router(clients.router,      prefix="/v1/clients")

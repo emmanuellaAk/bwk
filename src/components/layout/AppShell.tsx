@@ -1,9 +1,10 @@
 import {
   MessageCircle, LayoutDashboard, Calendar, Users,
-  Package, Truck, BarChart2, ExternalLink,
+  Package, Truck, BarChart2, ExternalLink, Settings,
 } from 'lucide-react'
 import { BottomNav, type Tab } from './BottomNav'
 import { cn } from '@/lib/utils'
+import { useSettings } from '@/lib/api/hooks/useSettings'
 
 const SIDEBAR_NAV = [
   { id: 'chat' as Tab,     label: 'Chat',      Icon: MessageCircle,  badge: null },
@@ -13,6 +14,7 @@ const SIDEBAR_NAV = [
   { id: 'inventory' as Tab,label: 'Inventory', Icon: Package,        badge: '3' },
   { id: 'suppliers' as Tab,label: 'Suppliers', Icon: Truck,          badge: null },
   { id: 'finance' as Tab,  label: 'Finance',   Icon: BarChart2,      badge: null },
+  { id: 'settings' as Tab, label: 'Settings', Icon: Settings,       badge: null },
 ]
 
 const HEADER: Record<string, { title: string; sub: string }> = {
@@ -23,6 +25,7 @@ const HEADER: Record<string, { title: string; sub: string }> = {
   inventory: { title: 'Inventory',  sub: '10 items · 3 low' },
   suppliers: { title: 'Suppliers',  sub: '3 partners' },
   finance:   { title: 'Finance',    sub: 'This month' },
+  settings:  { title: 'Settings',  sub: 'Salon & preferences' },
 }
 
 /* ── right context panel data (chat only) ── */
@@ -42,6 +45,10 @@ interface AppShellProps {
 export function AppShell({ activeTab, onTabChange, onOpenPortal, children }: AppShellProps) {
   const { title, sub } = HEADER[activeTab] ?? HEADER.chat
   const isChat = activeTab === 'chat'
+  const { data: salon } = useSettings()
+  const ownerName  = salon?.owner_name ?? 'Kez'
+  const salonName  = salon?.salon_name ?? 'BraiderOS'
+  const ownerInit  = ownerName.charAt(0).toUpperCase()
 
   return (
     <div className="flex min-h-dvh bg-surface">
@@ -51,11 +58,11 @@ export function AppShell({ activeTab, onTabChange, onOpenPortal, children }: App
         {/* Brand */}
         <div className="flex items-center gap-[11px] px-2 pb-5">
           <div className="w-[42px] h-[42px] rounded-full bg-plum flex items-center justify-center shadow-[0_2px_8px_rgba(110,27,58,0.14)] flex-none">
-            <span className="font-serif font-semibold text-[16px] text-white">K</span>
+            <span className="font-serif font-semibold text-[16px] text-white">{ownerInit}</span>
           </div>
           <div>
-            <div className="font-serif font-semibold text-[17px] leading-none tracking-[0.3px] text-ink">BraiderOS</div>
-            <div className="text-[11px] text-muted mt-[3px] font-medium">Braid with Kez</div>
+            <div className="font-serif font-semibold text-[17px] leading-none tracking-[0.3px] text-ink">{salonName}</div>
+            <div className="text-[11px] text-muted mt-[3px] font-medium">Braid with {ownerName}</div>
           </div>
         </div>
 
@@ -94,10 +101,10 @@ export function AppShell({ activeTab, onTabChange, onOpenPortal, children }: App
           </button>
           <div className="flex items-center gap-[10px] px-[6px] py-2 border-t border-line mt-1">
             <div className="w-[34px] h-[34px] rounded-full bg-plum flex items-center justify-center flex-none">
-              <span className="font-serif font-semibold text-[12px] text-white">K</span>
+              <span className="font-serif font-semibold text-[12px] text-white">{ownerInit}</span>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-bold text-[13px] text-ink">Kez Owusu</div>
+              <div className="font-bold text-[13px] text-ink">{ownerName}</div>
               <div className="text-[11px] text-muted">Pro plan</div>
             </div>
           </div>
@@ -112,7 +119,7 @@ export function AppShell({ activeTab, onTabChange, onOpenPortal, children }: App
           <div className="flex items-center gap-[11px]">
             <div className="relative flex-none">
               <div className="w-10 h-10 rounded-full bg-plum flex items-center justify-center shadow-[0_2px_8px_rgba(110,27,58,0.16)]">
-                <span className="font-serif font-semibold text-[15px] text-white">K</span>
+                <span className="font-serif font-semibold text-[15px] text-white">{ownerInit}</span>
               </div>
               <span className="absolute -right-px -bottom-px w-[11px] h-[11px] rounded-full bg-[#34C759] border-2 border-surface" />
             </div>
@@ -121,10 +128,19 @@ export function AppShell({ activeTab, onTabChange, onOpenPortal, children }: App
               <div className="text-[11.5px] text-muted font-medium mt-0.5">{sub}</div>
             </div>
           </div>
-          <button onClick={onOpenPortal} className="flex items-center gap-[7px] bg-plum text-white h-[38px] px-[15px] rounded-[12px] text-[12.5px] font-semibold cursor-pointer border-none hover:opacity-90 transition-opacity">
-            <ExternalLink size={14} strokeWidth={2.2} />
-            <span>Booking link</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onTabChange('settings')}
+              className="md:hidden w-[38px] h-[38px] flex items-center justify-center rounded-[12px] bg-surface-2 border border-line text-muted cursor-pointer hover:bg-white hover:text-ink transition-colors"
+              aria-label="Settings"
+            >
+              <Settings size={16} strokeWidth={1.8} />
+            </button>
+            <button onClick={onOpenPortal} className="flex items-center gap-[7px] bg-plum text-white h-[38px] px-[15px] rounded-[12px] text-[12.5px] font-semibold cursor-pointer border-none hover:opacity-90 transition-opacity">
+              <ExternalLink size={14} strokeWidth={2.2} />
+              <span>Booking link</span>
+            </button>
+          </div>
         </header>
 
         {/* Body: content + optional right panel */}

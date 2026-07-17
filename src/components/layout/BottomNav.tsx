@@ -1,7 +1,7 @@
 import { LayoutDashboard, Calendar, MessageCircle, Users, BarChart2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export type Tab = 'home' | 'calendar' | 'chat' | 'clients' | 'finance' | 'inventory' | 'suppliers' | 'services'
+export type Tab = 'home' | 'calendar' | 'chat' | 'clients' | 'finance' | 'inventory' | 'suppliers' | 'services' | 'settings'
 
 interface NavItem {
   id: Tab

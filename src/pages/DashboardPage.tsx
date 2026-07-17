@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { colorHex, initials, cedi } from '@/lib/braider'
 import { cn } from '@/lib/utils'
 import { useAppointments } from '@/lib/api/hooks/useAppointments'
+import { useSettings } from '@/lib/api/hooks/useSettings'
 import { tokenStore } from '@/lib/api/token'
 import type { AppointmentRecord } from '@/lib/api/hooks/useAppointments'
 import type { Tab } from '@/components/layout/BottomNav'
@@ -63,6 +64,7 @@ export function DashboardPage({ onNavigate }: Props) {
   }, [])
 
   const { data: todayAppts, isLoading: apptLoading } = useAppointments(todayStart, todayEnd)
+  const { data: salonSettings } = useSettings()
   const hasToken = !!tokenStore.get()
   const showApi  = hasToken && !apptLoading
 
@@ -76,7 +78,7 @@ export function DashboardPage({ onNavigate }: Props) {
       <div className="mb-6">
         <div className="text-[12px] text-muted font-semibold mb-1">{today}</div>
         <h1 className="font-serif font-medium text-[28px] leading-tight text-ink m-0">
-          Good morning, Kez
+          Good morning, {salonSettings?.owner_name ?? 'Kez'}
         </h1>
       </div>
 
