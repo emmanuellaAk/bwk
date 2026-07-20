@@ -11,8 +11,10 @@ def _normalise_phone(v: str | None) -> str | None:
     if not v:
         return None
     v = v.strip().replace(" ", "").replace("-", "")
+    if v.startswith("0") and len(v) == 10:
+        v = f"+233{v[1:]}"
     if not _E164.match(v):
-        raise ValueError("Phone must be in E.164 format, e.g. +233271234567")
+        raise ValueError("Phone must be in E.164 format, e.g. +233271234567 or a local 10-digit number starting with 0")
     return v
 
 

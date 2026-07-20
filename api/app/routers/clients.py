@@ -116,6 +116,7 @@ async def update_client(
     updates = body.model_dump(exclude_unset=True)
     for field, value in updates.items():
         setattr(client, field, value)
+    client.updated_at = datetime.now(timezone.utc)
 
     return ClientResponse.model_validate(client)
 

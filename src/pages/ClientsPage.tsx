@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { initials } from '@/lib/braider'
 import { cn } from '@/lib/utils'
 import type { Tab } from '@/components/layout/BottomNav'
-import { useClients, type ClientRecord } from '@/lib/api/hooks/useClients'
+import { useClients, useUpdateClient, type ClientRecord } from '@/lib/api/hooks/useClients'
 
 const SearchIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -134,7 +134,25 @@ function ClientDetail({
   onNavigate: (tab: Tab) => void
   onToast: (msg: string) => void
 }) {
+  const [editing, setEditing] = useState(false)
+  const [phone,   setPhone]   = useState(c.phone ?? '')
+  const [notes,   setNotes]   = useState(c.notes ?? '')
+  const [saving,  setSaving]  = useState(false)
+
+  const update = useUpdateClient()
   const waPhone = (c.phone ?? '').replace(/\s+/g, '').replace(/^\+/, '')
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await update.mutateAsync({ id: c.id, phone: phone.trim() || undefined, notes: notes.trim() || undefined })
+      onToast('Client updated')
+      setEditing(false)
+    } catch { onToast('Failed to save — try again') }
+    finally { setSaving(false) }
+  }
+
+  const inputCls = 'w-full border border-line rounded-[12px] px-[13px] py-[10px] text-[13.5px] text-ink font-medium bg-white outline-none focus:border-plum/50 transition-colors'
 
   return (
     <div className="p-[22px_24px] w-full">
@@ -154,31 +172,66 @@ function ClientDetail({
         >
           {initials(c.name)}
         </span>
-        <div>
+        <div className="flex-1 min-w-0">
           <h1 className="font-serif font-medium text-[23px] m-0 text-ink">{c.name}</h1>
           <div className="text-[12.5px] text-muted mt-[3px]">{c.phone ?? 'No phone number'}</div>
           <div className="text-[11px] text-muted mt-[5px]">
             Added {new Date(c.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
           </div>
         </div>
+        <button
+          onClick={() => { setPhone(c.phone ?? ''); setNotes(c.notes ?? ''); setEditing(e => !e) }}
+          className="flex-none h-[34px] px-[14px] bg-surface-2 border border-line rounded-[10px] text-[12.5px] font-semibold text-ink cursor-pointer hover:bg-white transition-colors"
+        >
+          {editing ? 'Cancel' : 'Edit'}
+        </button>
       </div>
+
+      {/* Edit form */}
+      {editing && (
+        <div className="bg-white border border-line rounded-[18px] p-5 mb-5 flex flex-col gap-4">
+          <div>
+            <label className="text-[12px] font-semibold text-muted block mb-[7px]">Phone number</label>
+            <input
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              placeholder="e.g. 0552030859"
+              className={inputCls}
+            />
+            <div className="text-[11px] text-muted mt-[5px]">Used for WhatsApp reminders</div>
+          </div>
+          <div>
+            <label className="text-[12px] font-semibold text-muted block mb-[7px]">Notes</label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Allergies, preferences, style notes…"
+              rows={3}
+              className={cn(inputCls, 'resize-none')}
+            />
+          </div>
+          <button
+            onClick={() => void handleSave()}
+            disabled={saving}
+            className="w-full bg-plum text-white border-none h-[44px] rounded-[12px] font-bold text-[13.5px] cursor-pointer hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : 'Save changes'}
+          </button>
+        </div>
+      )}
 
       {/* Body */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* Left: notes + actions */}
         <div>
-          {c.notes ? (
-            <div className="bg-surface-2 rounded-[16px] p-[14px] mb-[18px]">
-              <div className="text-[12px] font-bold text-plum mb-[6px]">📝 Notes</div>
-              <div className="text-[13px] leading-[1.5] text-ink">{c.notes}</div>
-            </div>
-          ) : (
-            <div className="bg-surface-2 rounded-[16px] p-[14px] mb-[18px]">
-              <div className="text-[12px] font-bold text-plum mb-[6px]">📝 Notes</div>
-              <div className="text-[13px] text-muted italic">No notes added yet</div>
-            </div>
-          )}
+          <div className="bg-surface-2 rounded-[16px] p-[14px] mb-[18px]">
+            <div className="text-[12px] font-bold text-plum mb-[6px]">📝 Notes</div>
+            {c.notes
+              ? <div className="text-[13px] leading-[1.5] text-ink">{c.notes}</div>
+              : <div className="text-[13px] text-muted italic">No notes added yet</div>
+            }
+          </div>
 
           <div className="flex gap-[9px]">
             <button
@@ -205,8 +258,8 @@ function ClientDetail({
           <h2 className="text-[14px] font-bold m-0 mb-[11px] text-ink">Appointment history</h2>
           <div className="bg-surface-2 border border-line rounded-[16px] p-[22px] text-center">
             <div className="text-[28px] mb-2">📅</div>
-            <div className="text-[13px] font-semibold text-ink mb-1">Coming in Sprint 4</div>
-            <div className="text-[12px] text-muted">Appointment history will appear here once the appointments backend is live.</div>
+            <div className="text-[13px] font-semibold text-ink mb-1">Coming soon</div>
+            <div className="text-[12px] text-muted">Full appointment history will appear here.</div>
           </div>
         </div>
       </div>

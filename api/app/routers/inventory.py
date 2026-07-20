@@ -103,6 +103,7 @@ async def update_stock_item(
     item = await _get_or_404(item_id, user, db)
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(item, field, value)
+    item.updated_at = datetime.now(timezone.utc)
     return _to_response(item)
 
 

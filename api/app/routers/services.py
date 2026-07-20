@@ -82,6 +82,7 @@ async def update_service(
     updates = body.model_dump(exclude_unset=True)
     for field, value in updates.items():
         setattr(service, field, value)
+    service.updated_at = datetime.now(timezone.utc)
 
     return ServiceResponse.model_validate(service)
 
