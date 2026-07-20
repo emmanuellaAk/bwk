@@ -1,6 +1,6 @@
 import {
   MessageCircle, LayoutDashboard, Calendar, Users,
-  Package, Truck, BarChart2, ExternalLink, Settings,
+  Package, Truck, BarChart2, ExternalLink, Settings, LogOut,
 } from 'lucide-react'
 import { BottomNav, type Tab } from './BottomNav'
 import { cn } from '@/lib/utils'
@@ -9,7 +9,7 @@ import { useSettings } from '@/lib/api/hooks/useSettings'
 const SIDEBAR_NAV = [
   { id: 'chat' as Tab,     label: 'Chat',      Icon: MessageCircle,  badge: null },
   { id: 'home' as Tab,     label: 'Dashboard', Icon: LayoutDashboard, badge: null },
-  { id: 'calendar' as Tab, label: 'Calendar',  Icon: Calendar,       badge: '3' },
+  { id: 'calendar' as Tab, label: 'Calendar',  Icon: Calendar,       badge: null },
   { id: 'clients' as Tab,  label: 'Clients',   Icon: Users,          badge: null },
   { id: 'inventory' as Tab,label: 'Inventory', Icon: Package,        badge: '3' },
   { id: 'suppliers' as Tab,label: 'Suppliers', Icon: Truck,          badge: null },
@@ -39,10 +39,11 @@ interface AppShellProps {
   activeTab: Tab
   onTabChange: (tab: Tab) => void
   onOpenPortal: () => void
+  onLogout: () => void
   children: React.ReactNode
 }
 
-export function AppShell({ activeTab, onTabChange, onOpenPortal, children }: AppShellProps) {
+export function AppShell({ activeTab, onTabChange, onOpenPortal, onLogout, children }: AppShellProps) {
   const { title, sub } = HEADER[activeTab] ?? HEADER.chat
   const isChat = activeTab === 'chat'
   const { data: salon } = useSettings()
@@ -107,6 +108,13 @@ export function AppShell({ activeTab, onTabChange, onOpenPortal, children }: App
               <div className="font-bold text-[13px] text-ink">{ownerName}</div>
               <div className="text-[11px] text-muted">Pro plan</div>
             </div>
+            <button
+              onClick={onLogout}
+              className="w-[30px] h-[30px] flex items-center justify-center rounded-[9px] bg-transparent border border-line text-muted cursor-pointer hover:bg-surface-2 hover:text-ink transition-colors flex-none"
+              title="Sign out"
+            >
+              <LogOut size={14} strokeWidth={1.8} />
+            </button>
           </div>
         </div>
       </aside>

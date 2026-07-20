@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     jwt_secret: str
     cors_origin: str  # comma-separated list of allowed origins
     gemini_api_key: str = ""
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_whatsapp_from: str = "whatsapp:+14155238886"  # Twilio sandbox default
 
     @property
     def cors_origins(self) -> list[str]:

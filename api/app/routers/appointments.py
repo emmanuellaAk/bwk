@@ -1,16 +1,20 @@
+import base64
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+import httpx
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.errors import AppError
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.client import Client
+from app.models.salon import Salon
 from app.models.service import Service
 from app.models.user import User
 from app.schemas.appointment import (
@@ -200,6 +204,7 @@ async def update_appointment(
 
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(appt, field, value)
+    appt.updated_at = datetime.now(timezone.utc)
 
     # Refetch names for response
     client_result = await db.execute(select(Client.name).where(Client.id == appt.client_id))
@@ -230,6 +235,7 @@ async def update_status(
         )
 
     appt.status = body.status
+    appt.updated_at = datetime.now(timezone.utc)
 
     client_result = await db.execute(select(Client.name).where(Client.id == appt.client_id))
     client_name = client_result.scalar_one_or_none()
@@ -252,3 +258,70 @@ async def cancel_appointment(
         raise AppError(422, "ALREADY_COMPLETED", "Cannot cancel a completed appointment")
     appt.status = AppointmentStatus.cancelled
     appt.updated_at = datetime.now(timezone.utc)
+
+
+@router.post("/{appt_id}/remind", status_code=204)
+async def send_reminder(
+    appt_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db:   AsyncSession = Depends(get_db),
+) -> None:
+    if not settings.twilio_account_sid or not settings.twilio_auth_token:
+        raise AppError(503, "TWILIO_NOT_CONFIGURED", "WhatsApp reminders are not configured")
+
+    # Load appointment with client + service
+    result = await db.execute(
+        select(Appointment, Client, Service)
+        .outerjoin(Client,  Appointment.client_id  == Client.id)
+        .outerjoin(Service, Appointment.service_id == Service.id)
+        .where(Appointment.id == appt_id, Appointment.salon_id == user.salon_id)
+    )
+    row = result.first()
+    if not row:
+        raise AppError(404, "NOT_FOUND", "Appointment not found")
+
+    appt, client, service = row
+    if not client or not client.phone:
+        raise AppError(422, "NO_PHONE", "Client has no phone number on file")
+
+    # Load salon name
+    salon_result = await db.execute(select(Salon).where(Salon.id == user.salon_id))
+    salon = salon_result.scalar_one_or_none()
+    salon_name = salon.name if salon else "your salon"
+
+    # Format appointment time
+    local_dt = appt.starts_at.strftime("%A, %b %-d at %-I:%M %p")
+    service_label = service.name if service else "your appointment"
+
+    body = (
+        f"Hi {client.name or 'there'}! 👋 This is a reminder from {salon_name}. "
+        f"You have {service_label} scheduled for {local_dt}. "
+        f"Reply STOP to opt out."
+    )
+
+    # Normalise to E.164 — local Ghana numbers like 0XXXXXXXXX → +233XXXXXXXXX
+    raw = client.phone.strip()
+    if raw.startswith("0") and len(raw) == 10:
+        raw = f"+233{raw[1:]}"
+    to_number = raw if raw.startswith("whatsapp:") else f"whatsapp:{raw}"
+    token = base64.b64encode(
+        f"{settings.twilio_account_sid}:{settings.twilio_auth_token}".encode()
+    ).decode()
+
+    async with httpx.AsyncClient(timeout=10) as http:
+        resp = await http.post(
+            f"https://api.twilio.com/2010-04-01/Accounts/{settings.twilio_account_sid}/Messages.json",
+            headers={"Authorization": f"Basic {token}"},
+            data={
+                "From": settings.twilio_whatsapp_from,
+                "To":   to_number,
+                "Body": body,
+            },
+        )
+
+    import structlog
+    log = structlog.get_logger()
+    log.info("twilio_response", status=resp.status_code, to=to_number, body=resp.text[:500])
+
+    if resp.status_code not in (200, 201):
+        raise AppError(502, "TWILIO_ERROR", f"Failed to send reminder: {resp.text[:200]}")

@@ -5,6 +5,7 @@ import {
   useAppointments,
   useUpdateAppointmentStatus,
   useCancelAppointment,
+  useSendReminder,
 } from '@/lib/api/hooks/useAppointments'
 import type { AppointmentRecord, AppointmentStatus } from '@/lib/api/hooks/useAppointments'
 
@@ -90,19 +91,23 @@ const LEGEND: { label: string; kind: Kind }[] = [
 
 export function CalendarPage() {
   const [view, setView] = useState<View>('week')
-  const [weekOffset, setWeekOffset] = useState(0)
+  // On Sunday (0) the Mon–Sat week view is entirely in the past — show next week
+  const [weekOffset, setWeekOffset] = useState(() => new Date().getDay() === 0 ? 1 : 0)
   const [selectedDay, setSelectedDay] = useState(() => {
-    const ws = getWeekStart(0)
+    const initialOffset = new Date().getDay() === 0 ? 1 : 0
+    const ws = getWeekStart(initialOffset)
     const idx = getTodayDayIdx(ws)
     return idx >= 0 ? idx : 0
   })
   const [activeFilters,  setActiveFilters]  = useState<Set<Kind>>(new Set(['confirmed', 'available', 'blocked']))
   const [actionLoading,  setActionLoading]  = useState<string | null>(null)
   const [confirmCancel,  setConfirmCancel]  = useState<string | null>(null)
+  const [reminderSent,   setReminderSent]   = useState<string | null>(null)
   const [toast,          setToast]          = useState<string | null>(null)
 
   const updateStatus = useUpdateAppointmentStatus()
   const cancelAppt   = useCancelAppointment()
+  const sendReminder = useSendReminder()
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -114,7 +119,20 @@ export function CalendarPage() {
     try {
       await updateStatus.mutateAsync({ id, status })
       showToast(status === 'confirmed' ? 'Appointment confirmed' : 'Appointment marked complete')
-    } catch { showToast('Action failed — try again') }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      showToast(`Failed: ${msg}`)
+    }
+    finally { setActionLoading(null) }
+  }
+
+  const handleRemind = async (id: string) => {
+    setActionLoading(id)
+    try {
+      await sendReminder.mutateAsync(id)
+      setReminderSent(id)
+      showToast('Reminder sent via WhatsApp')
+    } catch { showToast('Could not send reminder — check Twilio settings') }
     finally { setActionLoading(null) }
   }
 
@@ -386,6 +404,15 @@ export function CalendarPage() {
                                   className="h-[26px] px-[10px] bg-success text-white rounded-[8px] text-[11px] font-bold border-none cursor-pointer hover:opacity-90 disabled:opacity-50"
                                 >
                                   {isActing ? '…' : 'Complete'}
+                                </button>
+                              )}
+                              {e.status === 'confirmed' && (
+                                <button
+                                  onClick={() => void handleRemind(e.id)}
+                                  disabled={isActing || reminderSent === e.id}
+                                  className="h-[26px] px-[10px] bg-surface-2 text-ink border border-line rounded-lg text-[11px] font-semibold cursor-pointer hover:bg-white disabled:opacity-50 transition-colors"
+                                >
+                                  {reminderSent === e.id ? '✓ Sent' : '📲 Remind'}
                                 </button>
                               )}
                               <button

@@ -10,6 +10,12 @@ export interface FinanceSummary {
   revenue: number
   expenses: number
   profit: number
+  delta_pct: number | null
+}
+
+export interface DayCount {
+  day: string   // "Mon" … "Sat"
+  count: number
 }
 
 export interface MonthlyPoint {
@@ -88,6 +94,15 @@ export function useOutstanding() {
     queryFn: () => api.get<OutstandingRecord[]>('/v1/finance/outstanding'),
     enabled: enabled(),
     staleTime: 60_000,
+  })
+}
+
+export function useBusiestDays() {
+  return useQuery({
+    queryKey: ['finance', 'busiest-days'],
+    queryFn: () => api.get<DayCount[]>('/v1/finance/busiest-days'),
+    enabled: enabled(),
+    staleTime: 300_000,
   })
 }
 

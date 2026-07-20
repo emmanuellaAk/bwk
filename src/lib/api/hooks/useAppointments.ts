@@ -56,10 +56,12 @@ export function useCreateAppointment() {
 
 export function useUpdateAppointmentStatus() {
   const qc = useQueryClient()
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['appointments'] })
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: AppointmentStatus }) =>
       api.patch<AppointmentRecord>(`/v1/appointments/${id}/status`, { status }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
+    onSuccess: invalidate,
+    onError: invalidate,
   })
 }
 
@@ -68,5 +70,11 @@ export function useCancelAppointment() {
   return useMutation({
     mutationFn: (id: string) => api.delete<void>(`/v1/appointments/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
+  })
+}
+
+export function useSendReminder() {
+  return useMutation({
+    mutationFn: (id: string) => api.post<void>(`/v1/appointments/${id}/remind`, {}),
   })
 }

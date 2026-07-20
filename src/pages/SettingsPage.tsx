@@ -107,7 +107,7 @@ export function SettingsPage() {
           ))}
         </div>
       ) : (
-        <div className="flex flex-col gap-4 max-w-[560px]">
+        <div className="flex flex-col gap-4">
 
           <Section title="Your salon">
             <Field label="Salon name" hint="Shown on your public booking page">

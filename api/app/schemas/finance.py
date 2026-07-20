@@ -10,6 +10,12 @@ class FinanceSummary(BaseModel):
     revenue: float
     expenses: float
     profit: float
+    delta_pct: float | None = None  # revenue change vs previous period
+
+
+class DayCount(BaseModel):
+    day: str    # "Mon" … "Sat"
+    count: int
 
 
 class MonthlyPoint(BaseModel):

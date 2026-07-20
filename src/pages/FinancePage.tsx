@@ -8,6 +8,7 @@ import {
   useTopServices,
   useTransactions,
   useOutstanding,
+  useBusiestDays,
 } from '@/lib/api/hooks/useFinance'
 import type { Period } from '@/lib/api/hooks/useFinance'
 
@@ -18,6 +19,15 @@ const DEMO_STATS: Record<Period, { revenue: number; expenses: number; profit: nu
   month: { revenue: 9450,  expenses: 1620,  profit: 7830  },
   year:  { revenue: 98400, expenses: 14200, profit: 84200 },
 }
+
+const DEMO_BUSIEST_DAYS = [
+  { day: 'Mon', count: 8  },
+  { day: 'Tue', count: 12 },
+  { day: 'Wed', count: 6  },
+  { day: 'Thu', count: 14 },
+  { day: 'Fri', count: 18 },
+  { day: 'Sat', count: 24 },
+]
 
 const DEMO_BARS = [
   { month: 'Feb', revenue: 6200 },
@@ -74,17 +84,19 @@ export function FinancePage() {
   const [period, setPeriod] = useState<Period>('month')
   const hasToken = !!tokenStore.get()
 
-  const { data: summaryData } = useFinanceSummary(period)
-  const { data: monthlyData }  = useMonthlyRevenue(6)
-  const { data: servicesData } = useTopServices(5)
-  const { data: txnsData }     = useTransactions(20)
+  const { data: summaryData }     = useFinanceSummary(period)
+  const { data: monthlyData }     = useMonthlyRevenue(6)
+  const { data: servicesData }    = useTopServices(5)
+  const { data: txnsData }        = useTransactions(20)
   const { data: outstandingData } = useOutstanding()
+  const { data: busiestData }     = useBusiestDays()
 
-  const stats = summaryData ?? DEMO_STATS[period]
-  const barPoints  = monthlyData?.length  ? monthlyData  : DEMO_BARS
-  const topSvcs    = servicesData?.length ? servicesData : DEMO_TOP_SERVICES
-  const txns       = txnsData             ?? DEMO_TRANSACTIONS
-  const outstanding = outstandingData     ?? DEMO_OUTSTANDING
+  const stats       = summaryData          ?? { ...DEMO_STATS[period], delta_pct: null }
+  const barPoints   = monthlyData?.length  ? monthlyData  : DEMO_BARS
+  const topSvcs     = servicesData?.length ? servicesData : DEMO_TOP_SERVICES
+  const txns        = txnsData             ?? DEMO_TRANSACTIONS
+  const outstanding = outstandingData      ?? DEMO_OUTSTANDING
+  const busiestDays = busiestData?.length  ? busiestData  : DEMO_BUSIEST_DAYS
 
   const bars = buildBars(barPoints)
   const maxRev = Math.max(...topSvcs.map(s => s.revenue), 1)
@@ -123,7 +135,14 @@ export function FinancePage() {
         <div className="bg-white border border-line rounded-[16px] p-[14px]">
           <div className="text-[10.5px] text-muted font-semibold">Revenue</div>
           <div className="font-serif font-bold text-[20px] text-ink mt-1">{cedi(stats.revenue)}</div>
-          <div className="text-[11px] text-success font-semibold mt-[6px]">From confirmed appointments</div>
+          <div className={cn('text-[11px] font-semibold mt-[6px]',
+            stats.delta_pct == null ? 'text-muted' :
+            stats.delta_pct >= 0   ? 'text-success' : 'text-draft'
+          )}>
+            {stats.delta_pct == null
+              ? 'No prior period data'
+              : `${stats.delta_pct >= 0 ? '▲' : '▼'} ${Math.abs(stats.delta_pct)}% vs last ${period}`}
+          </div>
         </div>
         <div className="bg-white border border-line rounded-[16px] p-[14px]">
           <div className="text-[10.5px] text-muted font-semibold">Expenses</div>
@@ -192,7 +211,39 @@ export function FinancePage() {
         </div>
       </div>
 
-      {/* Row 3: Recent activity + Outstanding */}
+      {/* Row 3: Busiest days */}
+      <div className="bg-white border border-line rounded-[18px] p-5 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-[14px] font-bold text-ink m-0">Busiest days</h2>
+          <span className="text-[11px] text-muted font-semibold">last 90 days</span>
+        </div>
+        {(() => {
+          const maxCount = Math.max(...busiestDays.map(d => d.count), 1)
+          return (
+            <div className="flex flex-col gap-[10px]">
+              {busiestDays.map(d => (
+                <div key={d.day} className="flex items-center gap-3">
+                  <div className="w-[32px] text-[12px] font-semibold text-muted flex-none">{d.day}</div>
+                  <div className="flex-1 h-[10px] bg-surface-2 rounded-[5px] overflow-hidden">
+                    <div
+                      className="h-full rounded-[5px] transition-all"
+                      style={{
+                        width: `${Math.round((d.count / maxCount) * 100)}%`,
+                        background: d.count === maxCount
+                          ? 'linear-gradient(90deg,#6E1B3A,#8A2348)'
+                          : '#EFE3DF',
+                      }}
+                    />
+                  </div>
+                  <div className="w-[28px] text-right text-[12.5px] font-bold text-ink flex-none">{d.count}</div>
+                </div>
+              ))}
+            </div>
+          )
+        })()}
+      </div>
+
+      {/* Row 4: Recent activity + Outstanding */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         <div className="bg-white border border-line rounded-[18px] p-5">

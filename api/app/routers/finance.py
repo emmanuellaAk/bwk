@@ -13,6 +13,7 @@ from app.models.service import Service
 from app.models.transaction import Transaction, TransactionKind
 from app.models.user import User
 from app.schemas.finance import (
+    DayCount,
     FinanceSummary,
     MonthlyPoint,
     OutstandingRecord,
@@ -35,6 +36,21 @@ def _period_range(period: str) -> tuple[datetime, datetime]:
     else:
         start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
     return start, now
+
+
+def _prev_period_range(period: str) -> tuple[datetime, datetime]:
+    now = datetime.now(timezone.utc)
+    if period == "week":
+        end   = now - timedelta(days=7)
+        start = end - timedelta(days=7)
+    elif period == "month":
+        end   = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        prev  = end - timedelta(days=1)
+        start = prev.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:
+        end   = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        start = end.replace(year=end.year - 1)
+    return start, end
 
 
 @router.get("/summary", response_model=FinanceSummary)
@@ -69,11 +85,26 @@ async def get_summary(
     )
     expenses = float(exp_result.scalar() or 0)
 
+    # Previous period revenue for delta
+    prev_start, prev_end = _prev_period_range(period)
+    prev_result = await db.execute(
+        select(func.coalesce(func.sum(Appointment.total_price), 0))
+        .where(
+            Appointment.salon_id == user.salon_id,
+            Appointment.status.in_(_INCOME_STATUSES),
+            Appointment.starts_at >= prev_start,
+            Appointment.starts_at < prev_end,
+        )
+    )
+    prev_revenue = float(prev_result.scalar() or 0)
+    delta_pct = round((revenue - prev_revenue) / prev_revenue * 100, 1) if prev_revenue > 0 else None
+
     return FinanceSummary(
         period=period,
         revenue=round(revenue, 2),
         expenses=round(expenses, 2),
         profit=round(revenue - expenses, 2),
+        delta_pct=delta_pct,
     )
 
 
@@ -195,6 +226,33 @@ async def create_transaction(
         occurred_at=txn.occurred_at,
         created_at=txn.created_at,
     )
+
+
+@router.get("/busiest-days", response_model=list[DayCount])
+async def get_busiest_days(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[DayCount]:
+    since = datetime.now(timezone.utc) - timedelta(days=90)
+
+    result = await db.execute(
+        select(
+            func.extract("dow", Appointment.starts_at).label("dow"),
+            func.count().label("count"),
+        )
+        .where(
+            Appointment.salon_id == user.salon_id,
+            Appointment.status != AppointmentStatus.cancelled,
+            Appointment.starts_at >= since,
+        )
+        .group_by(func.extract("dow", Appointment.starts_at))
+        .order_by(func.extract("dow", Appointment.starts_at))
+    )
+
+    # PostgreSQL DOW: 0=Sun, 1=Mon … 6=Sat — return Mon–Sat only
+    _LABELS = {1: "Mon", 2: "Tue", 3: "Wed", 4: "Thu", 5: "Fri", 6: "Sat"}
+    counts = {int(row.dow): row.count for row in result.all()}
+    return [DayCount(day=_LABELS[d], count=counts.get(d, 0)) for d in range(1, 7)]
 
 
 @router.get("/outstanding", response_model=list[OutstandingRecord])

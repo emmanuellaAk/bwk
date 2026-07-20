@@ -1,6 +1,6 @@
 import { tokenStore } from './token'
 
-const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8000'
+const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? ''
 
 export class ApiError extends Error {
   constructor(
@@ -22,7 +22,7 @@ export function toE164(phone: string): string {
   return digits // already formatted or unknown — backend will validate
 }
 
-async function _refresh(): Promise<boolean> {
+export async function tryRefresh(): Promise<boolean> {
   try {
     const res = await fetch(`${BASE}/v1/auth/refresh`, {
       method: 'POST',
@@ -57,7 +57,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   // On 401, try a silent refresh then retry once
   if (res.status === 401 && token) {
-    const ok = await _refresh()
+    const ok = await tryRefresh()
     if (ok) {
       res = await send(tokenStore.get()!)
     }
