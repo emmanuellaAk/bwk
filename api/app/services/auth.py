@@ -27,6 +27,7 @@ _REFRESH_EXPIRE_DAYS = 30
 class TokenPair:
     access_token: str
     refresh_token: str  # raw — sent to client; never stored
+    is_phone_verified: bool = False
 
 
 class AuthService:
@@ -38,14 +39,21 @@ class AuthService:
         if existing.scalar_one_or_none():
             raise AppError(409, "PHONE_TAKEN", "An account with this phone number already exists")
 
+        if data.email:
+            dupe = await self.db.execute(select(User).where(User.email == data.email.lower()))
+            if dupe.scalar_one_or_none():
+                raise AppError(409, "EMAIL_TAKEN", "An account with this email already exists")
+
         salon = Salon(name=data.salon_name)
         self.db.add(salon)
-        await self.db.flush()  # get salon.id without committing yet
+        await self.db.flush()
 
         user = User(
             salon_id=salon.id,
             phone=data.phone,
+            email=data.email.lower() if data.email else None,
             password_hash=_ph.hash(data.password),
+            is_phone_verified=False,
         )
         self.db.add(user)
         await self.db.flush()
@@ -96,6 +104,19 @@ class AuthService:
 
         return await self._issue_tokens(user)
 
+    async def mark_phone_verified(self, phone: str) -> None:
+        result = await self.db.execute(select(User).where(User.phone == phone))
+        user = result.scalar_one_or_none()
+        if user:
+            user.is_phone_verified = True
+
+    async def reset_password(self, phone: str, new_password: str) -> None:
+        result = await self.db.execute(select(User).where(User.phone == phone))
+        user = result.scalar_one_or_none()
+        if not user:
+            raise AppError(404, "NOT_FOUND", "No account with that phone number")
+        user.password_hash = _ph.hash(new_password)
+
     async def revoke_refresh_token(self, raw_token: str) -> None:
         token_hash = _hash(raw_token)
         result = await self.db.execute(
@@ -116,7 +137,11 @@ class AuthService:
                 expires_at=datetime.now(timezone.utc) + timedelta(days=_REFRESH_EXPIRE_DAYS),
             )
         )
-        return TokenPair(access_token=access, refresh_token=raw_refresh)
+        return TokenPair(
+            access_token=access,
+            refresh_token=raw_refresh,
+            is_phone_verified=user.is_phone_verified,
+        )
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────

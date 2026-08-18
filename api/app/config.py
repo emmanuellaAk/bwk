@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_whatsapp_from: str = "whatsapp:+14155238886"  # Twilio sandbox default
+    twilio_verify_service_sid: str = ""
 
     @property
     def cors_origins(self) -> list[str]:
