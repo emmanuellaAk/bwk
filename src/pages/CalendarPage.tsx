@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
-import { initials, colorHex, cedi } from '@/lib/braider'
+import { initials, cedi } from '@/lib/braider'
 import {
   useAppointments,
   useUpdateAppointmentStatus,
@@ -150,7 +150,8 @@ export function CalendarPage() {
   useEffect(() => {
     const ws = getWeekStart(weekOffset)
     const idx = weekOffset === 0 ? getTodayDayIdx(ws) : 0
-    setSelectedDay(idx >= 0 ? idx : 0)
+    const timer = window.setTimeout(() => setSelectedDay(idx >= 0 ? idx : 0), 0)
+    return () => window.clearTimeout(timer)
   }, [weekOffset])
 
   const today = useMemo(() => {

@@ -47,11 +47,14 @@ export function SettingsPage() {
   // Populate form once data loads
   useEffect(() => {
     if (!data) return
-    setSalonName(data.salon_name)
-    setOwnerName(data.owner_name ?? '')
-    setHoursOpen(data.hours_open ?? '09:00')
-    setHoursClose(data.hours_close ?? '18:00')
-    setDepositPct(String(data.default_deposit_pct))
+    const timer = window.setTimeout(() => {
+      setSalonName(data.salon_name)
+      setOwnerName(data.owner_name ?? '')
+      setHoursOpen(data.hours_open ?? '09:00')
+      setHoursClose(data.hours_close ?? '18:00')
+      setDepositPct(String(data.default_deposit_pct))
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [data])
 
   const showToast = (msg: string) => {

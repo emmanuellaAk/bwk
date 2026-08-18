@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { cedi } from '@/lib/braider'
 import { cn } from '@/lib/utils'
-import { useSuppliers, useSupplier, type SupplierSummary, type SupplierDetail } from '@/lib/api/hooks/useSuppliers'
+import { useSuppliers, useSupplier, type SupplierDetail } from '@/lib/api/hooks/useSuppliers'
 import { tokenStore } from '@/lib/api/token'
 
 // ── Demo fallback ─────────────────────────────────────────────────────────────

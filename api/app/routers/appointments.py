@@ -6,6 +6,7 @@ from typing import Optional
 import httpx
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -161,7 +162,11 @@ async def create_appointment(
         total_price=body.total_price,
     )
     db.add(appt)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        raise AppError(409, "TIME_SLOT_TAKEN", "This time slot was just booked by someone else")
     return _build_response(appt, client_name, service_name)
 
 

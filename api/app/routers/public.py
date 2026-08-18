@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -10,6 +11,7 @@ from app.models.appointment import Appointment, AppointmentStatus
 from app.models.client import Client
 from app.models.salon import Salon
 from app.models.service import Service
+from app.routers.appointments import _check_overlap
 from app.schemas.public import PublicBookingRequest, PublicBookingResponse
 
 router = APIRouter(prefix="/public", tags=["public"])
@@ -69,7 +71,19 @@ async def create_public_booking(
     service_name = service.name if service else body.service_name
 
     starts_at = _parse_starts_at(body.date, body.time)
-    ends_at = starts_at + timedelta(hours=3)
+    duration_minutes = service.duration_minutes if service else 180
+    ends_at = starts_at + timedelta(minutes=duration_minutes)
+
+    if salon.hours_open and salon.hours_close:
+        try:
+            opening = datetime.strptime(salon.hours_open, "%H:%M").time()
+            closing = datetime.strptime(salon.hours_close, "%H:%M").time()
+        except ValueError:
+            raise AppError(500, "INVALID_SALON_HOURS", "Salon hours are misconfigured")
+        if starts_at.time() < opening or ends_at.time() > closing:
+            raise AppError(409, "OUTSIDE_SALON_HOURS", "This appointment is outside salon hours")
+
+    await _check_overlap(db, body.salon_id, starts_at, ends_at)
 
     appt = Appointment(
         salon_id=body.salon_id,
@@ -80,11 +94,16 @@ async def create_public_booking(
         status=AppointmentStatus.pending,
         color_hex=body.color_hex,
         notes=body.service_name if not service_id else None,
-        deposit_paid=body.deposit,
+        # The public flow has no payment provider yet, so never mark money as paid.
+        deposit_paid=0,
         total_price=body.total_price,
     )
     db.add(appt)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        raise AppError(409, "TIME_SLOT_TAKEN", "This time slot was just booked by someone else")
 
     return PublicBookingResponse(
         id=appt.id,

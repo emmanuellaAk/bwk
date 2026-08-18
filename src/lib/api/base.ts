@@ -1,14 +1,16 @@
 import { tokenStore } from './token'
+import { salonStore } from './salon'
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? ''
 
 export class ApiError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-    message: string,
-  ) {
+  readonly status: number
+  readonly code: string
+
+  constructor(status: number, code: string, message: string) {
     super(message)
+    this.status = status
+    this.code = code
     this.name = 'ApiError'
   }
 }
@@ -29,8 +31,17 @@ export async function tryRefresh(): Promise<boolean> {
       credentials: 'include', // sends the httpOnly cookie
     })
     if (!res.ok) { tokenStore.clear(); return false }
-    const { access_token } = await res.json() as { access_token: string }
+    const { access_token, is_phone_verified } = await res.json() as {
+      access_token: string
+      is_phone_verified: boolean
+    }
+    if (!is_phone_verified) {
+      tokenStore.clear()
+      salonStore.clear()
+      return false
+    }
     tokenStore.set(access_token)
+    salonStore.setFromToken(access_token)
     return true
   } catch {
     tokenStore.clear()

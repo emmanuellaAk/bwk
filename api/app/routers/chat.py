@@ -6,6 +6,7 @@ from openai import AsyncOpenAI
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -16,7 +17,8 @@ from app.models.appointment import Appointment, AppointmentStatus
 from app.models.client import Client
 from app.models.service import Service
 from app.models.user import User
-from app.schemas.chat import ChatRequest
+from app.schemas.chat import ChatRequest, ConfirmBookingRequest
+from app.routers.appointments import _check_overlap
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -203,6 +205,77 @@ def _sse(payload: dict) -> str:
 
 
 # ── Endpoint ──────────────────────────────────────────────────────────────────
+
+def _parse_booking_datetime(date_str: str, time_str: str) -> datetime:
+    for date_fmt in ("%Y-%m-%d", "%b %d", "%B %d"):
+        for time_fmt in ("%I:%M %p", "%I %p"):
+            try:
+                value = datetime.strptime(f"{date_str} {time_str.upper()}", f"{date_fmt} {time_fmt}")
+                if "%Y" not in date_fmt:
+                    value = value.replace(year=datetime.now(timezone.utc).year)
+                return value.replace(tzinfo=timezone.utc)
+            except ValueError:
+                continue
+    raise AppError(422, "INVALID_DATETIME", "Booking date or time could not be parsed")
+
+
+@router.post("/bookings", status_code=201)
+async def confirm_booking(
+    body: ConfirmBookingRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    draft = body.draft
+    client_result = await db.execute(
+        select(Client).where(
+            Client.salon_id == user.salon_id,
+            func.lower(Client.name) == draft.name.strip().lower(),
+            Client.deleted_at.is_(None),
+        ).order_by(Client.created_at.desc()).limit(1)
+    )
+    client = client_result.scalar_one_or_none()
+    if not client:
+        client = Client(salon_id=user.salon_id, name=draft.name.strip(), color_hex="#6E1B3A")
+        db.add(client)
+        await db.flush()
+
+    service_result = await db.execute(
+        select(Service).where(
+            Service.salon_id == user.salon_id,
+            func.lower(Service.name) == draft.style.strip().lower(),
+            Service.deleted_at.is_(None),
+        ).limit(1)
+    )
+    service = service_result.scalar_one_or_none()
+    starts_at = _parse_booking_datetime(draft.date, draft.time)
+    ends_at = starts_at + timedelta(minutes=service.duration_minutes if service else 180)
+    await _check_overlap(db, user.salon_id, starts_at, ends_at)
+
+    appointment = Appointment(
+        salon_id=user.salon_id,
+        client_id=client.id,
+        service_id=service.id if service else None,
+        starts_at=starts_at,
+        ends_at=ends_at,
+        status=AppointmentStatus.confirmed,
+        color_hex="#6E1B3A",
+        notes=draft.notes or None,
+        deposit_paid=draft.deposit,
+        total_price=draft.price,
+    )
+    db.add(appointment)
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        raise AppError(409, "TIME_SLOT_TAKEN", "This time slot was just booked by someone else")
+
+    return {
+        "id": str(appointment.id),
+        "status": "CONFIRMED",
+        "draft": draft.model_dump(),
+        "confirmedAt": datetime.now(timezone.utc).isoformat(),
+    }
 
 @router.post("/stream")
 async def chat_stream(

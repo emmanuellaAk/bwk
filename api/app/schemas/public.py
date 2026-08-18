@@ -1,5 +1,5 @@
 import uuid
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 from app.models.appointment import AppointmentStatus
 from datetime import datetime
 
@@ -38,6 +38,12 @@ class PublicBookingRequest(BaseModel):
             raise ValueError("Price values cannot be negative")
         return round(v, 2)
 
+    @model_validator(mode="after")
+    def deposit_not_above_total(self) -> "PublicBookingRequest":
+        if self.deposit > self.total_price:
+            raise ValueError("Deposit cannot exceed total price")
+        return self
+
 
 class PublicBookingResponse(BaseModel):
     id: uuid.UUID
@@ -45,4 +51,4 @@ class PublicBookingResponse(BaseModel):
     client_name: str
     service_name: str
     starts_at: datetime
-    message: str = "Booking received! Kez will confirm shortly."
+    message: str = "Booking request received. No payment has been charged. Kez will confirm the deposit details shortly."

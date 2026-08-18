@@ -207,7 +207,7 @@ export function LoginPage({ onLogin }: Props) {
           </div>
         </form>
         <div className="mt-4 text-center">
-          <InlineBtn onClick={onLogin}>Skip for now →</InlineBtn>
+          <p className="text-[11.5px] text-muted m-0">Verify your number to continue.</p>
         </div>
       </Shell>
     )

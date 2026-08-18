@@ -220,7 +220,7 @@ export function BookingPortal({ onClose }: Props) {
                   </div>
                 ))}
                 <div className="flex justify-between text-[13px] py-[9px] mt-[5px] border-t border-line items-center">
-                  <span className="text-muted">Deposit paid</span>
+                  <span className="text-muted">Deposit requested</span>
                   <span className="font-bold text-success">{cedi(service?.deposit ?? 0)}</span>
                 </div>
               </div>
@@ -408,9 +408,9 @@ export function BookingPortal({ onClose }: Props) {
                       submitting ? 'bg-plum/60 cursor-not-allowed' : 'bg-plum hover:opacity-90'
                     )}
                   >
-                    <CardIcon /> {submitting ? 'Processing…' : `Pay ${cedi(service.deposit)} deposit`}
+                    <CardIcon /> {submitting ? 'Submitting…' : 'Request booking'}
                   </button>
-                  <div className="text-center text-[11px] text-muted mt-[11px]">🔒 Secured by Mobile Money & card</div>
+                  <div className="text-center text-[11px] text-muted mt-[11px]">No payment is charged yet. Deposit details will be confirmed by Kez.</div>
                 </div>
               )}
 

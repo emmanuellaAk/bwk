@@ -74,21 +74,23 @@ export const httpClient: ApiClient = {
     yield { done: true }
   },
 
-  async confirmBooking(_bookingId: string, draft: BookingDraft): Promise<Booking> {
-    // Confirmation is local for now — booking portal wires to API in Sprint 7
-    await new Promise(r => setTimeout(r, 600))
-    return {
-      id:          _bookingId,
-      status:      'CONFIRMED',
-      draft,
-      confirmedAt: new Date().toISOString(),
-    }
+  async confirmBooking(bookingId: string, draft: BookingDraft): Promise<Booking> {
+    const res = await fetch(`${BASE}/v1/chat/bookings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${tokenStore.get() ?? ''}`,
+      },
+      body: JSON.stringify({ booking_id: bookingId, draft }),
+    })
+    if (!res.ok) throw new Error(`Booking API error ${res.status}`)
+    return res.json() as Promise<Booking>
   },
 
   async getNudges() {
     return []
   },
 
-  async dismissNudge(_nudgeId: string) {},
-  async actOnNudge(_nudgeId: string) {},
+  async dismissNudge() { return undefined },
+  async actOnNudge() { return undefined },
 }

@@ -61,14 +61,15 @@ export function BookingCard({ booking, onConfirm }: Props) {
 
   useEffect(() => {
     if (booking.status === 'CONFIRMED') {
-      setJustConfirmed(true)
+      const start = setTimeout(() => setJustConfirmed(true), 0)
       const t = setTimeout(() => setJustConfirmed(false), 1400)
-      return () => clearTimeout(t)
+      return () => { clearTimeout(start); clearTimeout(t) }
     }
   }, [booking.status])
 
   useEffect(() => {
-    setDraft(booking.draft)
+    const t = setTimeout(() => setDraft(booking.draft), 0)
+    return () => clearTimeout(t)
   }, [booking.draft])
 
   const hex = colorHex(draft.color)

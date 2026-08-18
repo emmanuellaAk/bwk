@@ -37,4 +37,7 @@ async def get_current_user(
     if not user:
         raise _invalid
 
+    if not user.is_phone_verified:
+        raise AppError(403, "PHONE_NOT_VERIFIED", "Verify your phone number to access the dashboard")
+
     return user
