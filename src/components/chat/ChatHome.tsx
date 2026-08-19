@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { useChat } from '@/lib/api/hooks/useChat'
 import { useNudges } from '@/lib/api/hooks/useNudges'
 import { ProactiveNudgeCard } from './ProactiveNudgeCard'
@@ -44,9 +44,11 @@ const Cursor = () => (
 )
 
 export function ChatHome() {
-  const { messages, sendMessage, isPending, confirmBooking } = useChat()
+  const { messages, sessions, activeSessionId, selectSession, newSession, renameSession, deleteSession, sendMessage, isPending, confirmBooking } = useChat()
   const { nudges, dismissNudge, actOnNudge } = useNudges()
   const feedRef = useRef<HTMLDivElement>(null)
+  const [renaming, setRenaming] = useState(false)
+  const [sessionTitle, setSessionTitle] = useState('')
 
   useEffect(() => {
     const el = feedRef.current
@@ -61,9 +63,44 @@ export function ChatHome() {
   })()
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-h-0">
+      <div className="flex-none flex items-center gap-2 px-[14px] py-2 bg-surface border-b border-line">
+        <select
+          value={activeSessionId ?? ''}
+          onChange={event => { setRenaming(false); selectSession(event.target.value || null) }}
+          className="min-w-0 flex-1 bg-surface-2 border border-line rounded-[10px] px-3 py-2 text-[12px] font-semibold text-ink outline-none"
+          aria-label="Chat session"
+        >
+          {!activeSessionId && <option value="">New chat</option>}
+          {sessions.map(session => <option key={session.id} value={session.id}>{session.title}</option>)}
+        </select>
+        {activeSessionId && (renaming ? (
+          <div className="flex items-center gap-1">
+            <input
+              autoFocus
+              value={sessionTitle}
+              onChange={event => setSessionTitle(event.target.value)}
+              onKeyDown={event => { if (event.key === 'Enter') { renameSession(activeSessionId, sessionTitle); setRenaming(false) } }}
+              className="w-[130px] bg-white border border-line rounded-[10px] px-2 py-2 text-[12px] text-ink outline-none"
+              aria-label="Session name"
+            />
+            <button onClick={() => { renameSession(activeSessionId, sessionTitle); setRenaming(false) }} className="bg-plum text-white border-none rounded-[9px] px-2 py-2 text-[11px] font-bold cursor-pointer">Save</button>
+          </div>
+        ) : (
+          <>
+            <button onClick={() => { setSessionTitle(sessions.find(session => session.id === activeSessionId)?.title ?? ''); setRenaming(true) }} className="bg-transparent text-muted border border-line rounded-[9px] px-2 py-2 text-[11px] font-semibold cursor-pointer">Rename</button>
+            <button onClick={() => deleteSession(activeSessionId)} className="bg-transparent text-draft border border-line rounded-[9px] px-2 py-2 text-[11px] font-semibold cursor-pointer">Delete</button>
+          </>
+        ))}
+        <button
+          onClick={newSession}
+          className="flex-none bg-plum-soft text-plum border-none rounded-[10px] px-3 py-2 text-[12px] font-bold cursor-pointer"
+        >
+          New chat
+        </button>
+      </div>
       {/* Scrollable feed */}
-      <div ref={feedRef} className="flex-1 overflow-y-auto bos-scroll">
+      <div ref={feedRef} className="flex-1 min-h-0 overflow-y-auto bos-scroll">
         <div className="flex flex-col gap-[11px] px-[14px] py-[14px] max-w-[680px] mx-auto">
 
           {/* Greeting */}

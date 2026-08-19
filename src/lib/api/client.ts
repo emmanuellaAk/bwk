@@ -8,7 +8,16 @@ import type { ChatEntry } from './types'
 export const apiClient: ApiClient = {
   async *streamMessage(text: string, history: readonly ChatEntry[]) {
     if (tokenStore.get()) {
-      yield* httpClient.streamMessage(text, history)
+      try {
+        yield* httpClient.streamMessage(text, history)
+      } catch (error) {
+        // Keep the demo usable when Gemini is not configured locally.
+        if (import.meta.env.DEV && error instanceof Error && ['AI_NOT_CONFIGURED', 'AI_PROVIDER_UNAVAILABLE'].includes(error.message)) {
+          yield* mockClient.streamMessage(text, history)
+          return
+        }
+        throw error
+      }
     } else {
       yield* mockClient.streamMessage(text, history)
     }
@@ -18,6 +27,11 @@ export const apiClient: ApiClient = {
     tokenStore.get()
       ? httpClient.confirmBooking(...args)
       : mockClient.confirmBooking(...args),
+
+  recordInventoryPurchase: (input) =>
+    tokenStore.get()
+      ? httpClient.recordInventoryPurchase(input)
+      : mockClient.recordInventoryPurchase(input),
 
   getNudges: () =>
     tokenStore.get()

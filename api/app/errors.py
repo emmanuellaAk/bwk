@@ -1,4 +1,5 @@
 from fastapi import Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from app.logger import log
@@ -29,7 +30,7 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
         content={
             "code": "VALIDATION_ERROR",
             "message": "Invalid request data",
-            "errors": exc.errors(),
+            "errors": jsonable_encoder(exc.errors()),
             "request_id": get_request_id(request),
         },
     )

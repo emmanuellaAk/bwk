@@ -47,3 +47,24 @@ class BookingDraft(BaseModel):
 class ConfirmBookingRequest(BaseModel):
     booking_id: str
     draft: BookingDraft
+
+
+class InventoryPurchaseRequest(BaseModel):
+    color: str
+    length: str
+    quantity: int
+    total_price: float
+
+    @field_validator("quantity")
+    @classmethod
+    def positive_quantity(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("Quantity must be positive")
+        return value
+
+    @field_validator("total_price")
+    @classmethod
+    def non_negative_total(cls, value: float) -> float:
+        if value < 0:
+            raise ValueError("Total price cannot be negative")
+        return round(value, 2)

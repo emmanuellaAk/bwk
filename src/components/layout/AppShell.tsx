@@ -7,8 +7,8 @@ import { cn } from '@/lib/utils'
 import { useSettings } from '@/lib/api/hooks/useSettings'
 
 const SIDEBAR_NAV = [
-  { id: 'chat' as Tab,     label: 'Chat',      Icon: MessageCircle,  badge: null },
   { id: 'home' as Tab,     label: 'Dashboard', Icon: LayoutDashboard, badge: null },
+  { id: 'chat' as Tab,     label: 'Chat',      Icon: MessageCircle,  badge: null },
   { id: 'calendar' as Tab, label: 'Calendar',  Icon: Calendar,       badge: null },
   { id: 'clients' as Tab,  label: 'Clients',   Icon: Users,          badge: null },
   { id: 'inventory' as Tab,label: 'Inventory', Icon: Package,        badge: '3' },
@@ -52,7 +52,7 @@ export function AppShell({ activeTab, onTabChange, onOpenPortal, onLogout, child
   const ownerInit  = ownerName.charAt(0).toUpperCase()
 
   return (
-    <div className="flex min-h-dvh bg-surface">
+    <div className="flex h-dvh overflow-hidden bg-surface">
 
       {/* ── Desktop sidebar ── */}
       <aside className="hidden md:flex flex-col w-[248px] flex-none border-r border-line bg-surface px-4 py-5">
@@ -120,7 +120,7 @@ export function AppShell({ activeTab, onTabChange, onOpenPortal, onLogout, child
       </aside>
 
       {/* ── Main column ── */}
-      <div className="flex flex-col flex-1 min-w-0 min-h-dvh">
+      <div className="flex flex-col flex-1 min-w-0 min-h-0 h-full">
 
         {/* Header */}
         <header className="flex-none flex items-center justify-between px-4 md:px-6 py-3 bg-surface border-b border-line">
@@ -152,7 +152,7 @@ export function AppShell({ activeTab, onTabChange, onOpenPortal, onLogout, child
         </header>
 
         {/* Body: content + optional right panel */}
-        <div className="flex flex-1 min-h-0">
+        <div className="flex flex-1 min-h-0 overflow-hidden">
           <main className={cn('flex-1 min-w-0 flex flex-col overflow-hidden', isChat && 'flex flex-col')}>
             {children}
           </main>

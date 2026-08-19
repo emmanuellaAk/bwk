@@ -17,11 +17,21 @@ import { tokenStore } from '@/lib/api/token'
 import type { Tab } from '@/components/layout/BottomNav'
 
 const queryClient = new QueryClient()
+const TABS: Tab[] = ['home', 'calendar', 'chat', 'clients', 'finance', 'inventory', 'suppliers', 'services', 'settings']
+
+function loadActiveTab(): Tab {
+  try {
+    const saved = localStorage.getItem('braider-active-tab') as Tab | null
+    return saved && TABS.includes(saved) ? saved : 'home'
+  } catch {
+    return 'home'
+  }
+}
 
 function BraiderOS() {
   const [loggedIn, setLoggedIn] = useState(false)
   const [checking, setChecking] = useState(true)
-  const [tab,      setTab]      = useState<Tab>('home')
+  const [tab,      setTab]      = useState<Tab>(loadActiveTab)
   const [portal,   setPortal]   = useState(false)
 
   useEffect(() => {
@@ -30,6 +40,10 @@ function BraiderOS() {
       setChecking(false)
     })
   }, [])
+
+  useEffect(() => {
+    try { localStorage.setItem('braider-active-tab', tab) } catch { /* ignore storage failures */ }
+  }, [tab])
 
   if (checking) return null
 

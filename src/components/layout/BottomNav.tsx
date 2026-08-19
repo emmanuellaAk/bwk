@@ -12,8 +12,8 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'home',     label: 'Home',     Icon: LayoutDashboard },
-  { id: 'calendar', label: 'Calendar', Icon: Calendar },
   { id: 'chat',     center: true,      Icon: MessageCircle },
+  { id: 'calendar', label: 'Calendar', Icon: Calendar },
   { id: 'clients',  label: 'Clients',  Icon: Users },
   { id: 'finance',  label: 'Finance',  Icon: BarChart2 },
 ]

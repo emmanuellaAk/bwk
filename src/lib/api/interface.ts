@@ -7,6 +7,8 @@ export interface ApiClient {
   /** Confirm a DRAFT booking → returns CONFIRMED booking */
   confirmBooking(bookingId: string, draft: BookingDraft): Promise<Booking>
 
+  recordInventoryPurchase(input: { color: string; length: string; quantity: number; total_price: number }): Promise<void>
+
   /** Fetch active (non-dismissed) nudges */
   getNudges(): Promise<Nudge[]>
 

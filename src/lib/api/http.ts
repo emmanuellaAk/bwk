@@ -27,7 +27,10 @@ export const httpClient: ApiClient = {
       body: JSON.stringify({ messages }),
     })
 
-    if (!res.ok) throw new Error(`Chat API error ${res.status}`)
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({})) as { code?: string; message?: string }
+      throw new Error(body.code ?? `Chat API error ${res.status}`)
+    }
     if (!res.body) throw new Error('No response body')
 
     const reader  = res.body.getReader()
@@ -86,6 +89,10 @@ export const httpClient: ApiClient = {
     })
     if (!res.ok) throw new Error(`Booking API error ${res.status}`)
     return res.json() as Promise<Booking>
+  },
+
+  async recordInventoryPurchase(input) {
+    await api.post('/v1/chat/inventory-purchases', input)
   },
 
   async getNudges() {

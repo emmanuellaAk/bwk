@@ -1,4 +1,5 @@
 import json
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -17,9 +18,11 @@ from app.logger import log
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.client import Client
 from app.models.service import Service
+from app.models.stock_item import StockItem
+from app.models.stock_purchase import StockPurchase
 from app.models.transaction import Transaction, TransactionKind
 from app.models.user import User
-from app.schemas.chat import ChatRequest, ConfirmBookingRequest
+from app.schemas.chat import ChatRequest, ConfirmBookingRequest, InventoryPurchaseRequest
 from app.routers.appointments import _check_overlap
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -252,6 +255,33 @@ def _parse_booking_datetime(date_str: str, time_str: str) -> datetime:
     raise AppError(422, "INVALID_DATETIME", "Booking date or time could not be parsed")
 
 
+async def _build_booking_draft(inp: dict, user_text: str, db: AsyncSession, user: User) -> dict:
+    lower = user_text.lower()
+    locs_match = re.search(r"\b((?:[a-z]+\s+)?locs?)\b", lower)
+    service_match = re.search(r"\b(?:braiding|braids?|doing)\s+(.+?)(?=\s+(?:on|at|and|for|everything)\b|\s*$)", lower)
+    style = locs_match.group(1).title() if locs_match else service_match.group(1).title() if service_match else str(inp.get("service") or "Knotless Braids")
+
+    service_result = await db.execute(select(Service).where(Service.salon_id == user.salon_id, func.lower(Service.name) == style.lower(), Service.deleted_at.is_(None)).limit(1))
+    service = service_result.scalar_one_or_none()
+    explicit_price = re.search(r"(?:gh₵|ghs?)\s*(\d+(?:\.\d+)?)|\b(\d+(?:\.\d+)?)\s*(?:cedis?|ghs?|gh₵)\b", lower)
+    price = float(explicit_price.group(1) or explicit_price.group(2)) if explicit_price else float(service.price) if service else 350
+    color_match = re.search(r"\b(blonde|burgundy|brown|copper|pink|red)\b", style, re.I)
+
+    name_match = re.search(r"\bfor\s+([a-z][a-z'-]*(?:\s+[a-z][a-z'-]*)?)(?=\s+(?:on|at|for|who|she|he|,)|\s*$)", lower, re.I)
+    time_match = re.search(r"\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b", lower, re.I)
+    draft = {
+        "name": name_match.group(1).title() if name_match else str(inp.get("client_name") or "New Client"),
+        "style": style,
+        "date": str(inp.get("date") or ""),
+        "time": f"{time_match.group(1)}:{time_match.group(2) or '00'} {time_match.group(3).upper()}" if time_match else str(inp.get("time") or "9:00 AM"),
+        "color": color_match.group(1).title() if color_match else str(inp.get("color") or "Natural Black"),
+        "price": round(price, 2),
+        "deposit": round(price * 0.3, 2),
+        "notes": f"Requested: {style.lower()}" if (locs_match or service_match) else "",
+    }
+    return draft
+
+
 @router.post("/bookings", status_code=201)
 async def confirm_booking(
     body: ConfirmBookingRequest,
@@ -309,6 +339,31 @@ async def confirm_booking(
         "draft": draft.model_dump(),
         "confirmedAt": datetime.now(timezone.utc).isoformat(),
     }
+
+
+@router.post("/inventory-purchases", status_code=201)
+async def record_inventory_purchase(
+    body: InventoryPurchaseRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    color = body.color.strip()
+    length = body.length.strip()
+    result = await db.execute(select(StockItem).where(StockItem.salon_id == user.salon_id, func.lower(StockItem.color) == color.lower(), func.lower(StockItem.length) == length.lower()))
+    item = result.scalar_one_or_none()
+    price_per_pack = body.total_price / body.quantity
+    if item:
+        item.packs += body.quantity
+        item.updated_at = datetime.now(timezone.utc)
+    else:
+        item = StockItem(salon_id=user.salon_id, color=color.title(), length=length.title(), packs=body.quantity, max_packs=max(20, body.quantity), price_per_pack=price_per_pack)
+        db.add(item)
+        await db.flush()
+
+    purchase = StockPurchase(salon_id=user.salon_id, stock_item_id=item.id, quantity=body.quantity, price_per_pack=price_per_pack, occurred_at=datetime.now(timezone.utc))
+    db.add(purchase)
+    await db.flush()
+    return {"color": item.color, "length": item.length, "quantity": body.quantity, "total_price": body.total_price}
 
 @router.post("/stream")
 async def chat_stream(
@@ -375,21 +430,13 @@ async def chat_stream(
                 name = tc["name"]
 
                 if name == "show_booking_draft":
+                    draft = await _build_booking_draft(inp, body.messages[-1].content, db, user)
                     yield _sse({
                         "type": "booking",
                         "value": {
                             "id":     f"booking-{uuid.uuid4().hex[:8]}",
                             "status": "DRAFT",
-                            "draft": {
-                                "name":    inp.get("client_name", ""),
-                                "style":   inp.get("service", ""),
-                                "date":    inp.get("date", ""),
-                                "time":    inp.get("time", ""),
-                                "color":   inp.get("color", "Natural Black"),
-                                "price":   inp.get("price", 0),
-                                "deposit": inp.get("deposit", 0),
-                                "notes":   "",
-                            },
+                            "draft": draft,
                         },
                     })
 
@@ -421,7 +468,7 @@ async def chat_stream(
 
         except Exception:
             log.error("chat_provider_error", request_id="chat_stream")
-            yield _sse({"type": "error", "value": "The assistant is temporarily unavailable. Please try again."})
+            yield _sse({"type": "error", "value": "AI_PROVIDER_UNAVAILABLE"})
 
         yield _sse({"type": "done"})
 

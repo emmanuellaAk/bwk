@@ -50,22 +50,60 @@ function classify(q: string): string {
   return 'fallback'
 }
 
+function titleCase(value: string) {
+  return value.trim().replace(/\b\w/g, letter => letter.toUpperCase())
+}
+
+function addDays(date: Date, days: number) {
+  const result = new Date(date)
+  result.setDate(result.getDate() + days)
+  return result
+}
+
+function shortDate(date: Date) {
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
 function parseBookingFromText(text: string): Partial<BookingDraft> | null {
-  const t = text.toLowerCase()
-  const names = ['ama mensah', 'esi owusu', 'abena sarpong', 'akua darko', 'nana adjei']
-  const name = names.find(n => t.includes(n.split(' ')[0].toLowerCase()))
-  const styles = ['knotless braids', 'boho braids', 'goddess braids', 'cornrows', 'fulani braids', 'box braids']
-  const style = styles.find(s => t.includes(s.split(' ')[0]))
-  if (!name && !style) return null
+  const lower = text.toLowerCase()
+  if (!/\b(book|schedule|appointment)\b/.test(lower)) return null
+
+  const nameMatch = lower.match(/\bfor\s+([a-z][a-z'-]*(?:\s+[a-z][a-z'-]*)?)(?=\s+(?:on|at|for|who|she|he|,)|\s*$)/i)
+  const name = nameMatch ? titleCase(nameMatch[1]) : 'New Client'
+
+  const timeMatch = lower.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i)
+  const time = timeMatch
+    ? `${timeMatch[1]}:${timeMatch[2] ?? '00'} ${timeMatch[3].toUpperCase()}`
+    : '9:00 AM'
+
+  const weekdayMatch = lower.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/)
+  let date = shortDate(addDays(new Date(), 1))
+  if (weekdayMatch) {
+    const weekday = weekdayMatch[1]
+    const target = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].indexOf(weekday)
+    const today = new Date()
+    const daysUntil = (target - today.getDay() + 7) % 7 || 7
+    date = shortDate(addDays(today, daysUntil))
+  } else {
+    const dateMatch = lower.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})\b/i)
+    if (dateMatch) date = titleCase(`${dateMatch[1]} ${dateMatch[2]}`)
+  }
+
+  const priceMatch = lower.match(/(?:gh₵|ghs?)\s*(\d+(?:\.\d+)?)|\b(\d+(?:\.\d+)?)\s*(?:cedis?|ghs?|gh₵)\b/i)
+  const price = priceMatch ? Number(priceMatch[1] ?? priceMatch[2]) : 350
+  const locsMatch = lower.match(/\b((?:[a-z]+\s+)?locs?)\b/i)
+  const serviceMatch = lower.match(/\b(?:braiding|braids?|doing)\s+(.+?)(?=\s+(?:on|at|and|for|everything)\b|\s*$)/i)
+  const style = locsMatch ? titleCase(locsMatch[1]) : serviceMatch ? titleCase(serviceMatch[1]) : 'Knotless Braids'
+
   return {
-    name:    name ? name.split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ') : 'New Client',
-    style:   style ? style.split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ') : 'Knotless Braids',
-    date:    'Jul 20',
-    time:    '10:00 AM',
-    color:   'Natural Black',
-    price:   350,
-    deposit: 105,
-    notes:   '',
+    name,
+    style,
+    date,
+    time,
+    color: /\b(blonde|burgundy|brown|copper|pink|red)\b/i.test(style) ? titleCase(style.match(/\b(blonde|burgundy|brown|copper|pink|red)\b/i)?.[1] ?? 'Natural Black') : 'Natural Black',
+    price,
+    deposit: Math.round(price * 0.3),
+    notes: locsMatch ? `Requested: ${locsMatch[1]}` : serviceMatch ? `Requested: ${serviceMatch[1]}` : '',
   }
 }
 
@@ -95,7 +133,7 @@ const RESPONSES: Record<string, string> = {
     "You have **48 clients** in your book, 5 active this month. Your most loyal this quarter are Abena Sarpong (6 visits), Ama Mensah (5 visits), and Esi Owusu (4 visits).\n\nAverage client lifetime value: GH₵966.",
 
   stock:
-    "You have **3 items running low** right now:\n\n• Dark Brown 20″ — 1 pack left ⚠️\n• Burgundy 24″ — 1 pack left ⚠️\n• Ombre Grey 22″ — 2 packs left\n\nRoyal Hair Supplies is your main supplier. Want me to put together a reorder list?",
+    "Low stock: Dark Brown 20″ (1 pack), Burgundy 24″ (1 pack), and Ombre Grey 22″ (2 packs).",
 
   reminder:
     "I can send a WhatsApp reminder to any client. Who should I remind — Ama Mensah about tomorrow's balance, or Esi Boateng about today's appointment?\n\nJust say the name and I'll draft it.",
@@ -115,11 +153,18 @@ export const mockClient: ApiClient = {
     const lower = text.toLowerCase()
     const intent = classify(text)
 
+    const purchaseMatch = lower.match(/\bbought\s+(\d+)\s+(?:packs?|pacs?)\s+of\s+(.+?)\s+(?:and\s+)?(?:they\s+)?(?:were|cost|for)\s+(?:gh₵|ghs?\s*)?(\d+(?:\.\d+)?)\s*(?:cedis?|ghs?|gh₵)?\b/i)
+    if (purchaseMatch) {
+      yield* stream(`Inventory updated: ${purchaseMatch[1]} packs of ${titleCase(purchaseMatch[2])} added for GH₵${purchaseMatch[3]} total.`)
+      yield { done: true }
+      return
+    }
+
     // Try to parse a booking from free text
     if (intent === 'booking_intent' || intent === 'fallback') {
       const draft = parseBookingFromText(text)
       if (draft) {
-        const intro = `Got it! Here's a booking draft for ${draft.name} — review the details and confirm when you're ready.`
+        const intro = `Booking draft ready for ${draft.name}.`
         yield* stream(intro)
         const id = `booking-${bookingCounter++}`
         const booking: Booking = {
@@ -128,6 +173,14 @@ export const mockClient: ApiClient = {
         }
         bookingStore.set(id, booking)
         yield { booking }
+        if (/\b(available|availability|open slots?|rest of the available dates?)\b/.test(lower)) {
+          yield {
+            avail: {
+              title: 'Other open slots',
+              body: 'Mon 11:00 AM · Tue 12:30 PM · Thu 2:30 PM · Fri 1:00 PM',
+            },
+          }
+        }
         yield { done: true }
         return
       }
@@ -150,11 +203,11 @@ export const mockClient: ApiClient = {
     }
 
     if (intent === 'today') {
-      yield* stream('Here\'s what today looks like:')
+      yield* stream('Today\'s appointments and this week\'s open slots:')
       yield {
         avail: {
-          title: 'Tue, Jul 14 — 3 appointments',
-          body: '9:00 AM · Ama Mensah  ·  11:30 AM · Esi Boateng  ·  2:00 PM · Abena Sarpong',
+          title: 'Today + open slots',
+          body: 'Today: Ama Mensah at 9:00 AM. Open slots: Mon 11:00 AM · Tue 12:30 PM · Thu 2:30 PM · Fri 1:00 PM.',
         },
       }
       yield { done: true }
@@ -187,6 +240,8 @@ export const mockClient: ApiClient = {
     bookingStore.set(bookingId, confirmed)
     return confirmed
   },
+
+  async recordInventoryPurchase() {},
 
   async getNudges() {
     await delay(200)
