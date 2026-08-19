@@ -14,6 +14,18 @@ export interface StockItemRecord {
   updated_at: string
 }
 
+export interface PurchaseHistoryRecord {
+  id: string
+  stock_item_id: string | null
+  color: string | null
+  length: string | null
+  supplier_name: string | null
+  quantity: number
+  price_per_pack: number
+  total: number
+  occurred_at: string
+}
+
 const KEY = ['inventory'] as const
 
 export function useInventory() {
@@ -22,6 +34,15 @@ export function useInventory() {
     queryFn: () => api.get<StockItemRecord[]>('/v1/inventory'),
     enabled: !!tokenStore.get(),
     staleTime: 60_000,
+  })
+}
+
+export function usePurchaseHistory() {
+  return useQuery({
+    queryKey: [...KEY, 'purchases'],
+    queryFn: () => api.get<PurchaseHistoryRecord[]>('/v1/inventory/purchases'),
+    enabled: !!tokenStore.get(),
+    staleTime: 30_000,
   })
 }
 

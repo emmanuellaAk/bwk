@@ -50,6 +50,20 @@ class StockItemUpdate(BaseModel):
     max_packs: Optional[int] = None
     price_per_pack: Optional[float] = None
 
+    @field_validator("packs", "max_packs")
+    @classmethod
+    def non_negative_int(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and v < 0:
+            raise ValueError("Cannot be negative")
+        return v
+
+    @field_validator("price_per_pack")
+    @classmethod
+    def non_negative_price(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None and v < 0:
+            raise ValueError("Cannot be negative")
+        return round(v, 2) if v is not None else None
+
 
 class RestockRequest(BaseModel):
     quantity: int
@@ -76,3 +90,15 @@ class StockItemResponse(BaseModel):
     status: StockStatus
     created_at: datetime
     updated_at: datetime
+
+
+class PurchaseHistoryResponse(BaseModel):
+    id: uuid.UUID
+    stock_item_id: Optional[uuid.UUID]
+    color: Optional[str]
+    length: Optional[str]
+    supplier_name: Optional[str]
+    quantity: int
+    price_per_pack: float
+    total: float
+    occurred_at: datetime

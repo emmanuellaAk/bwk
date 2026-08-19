@@ -68,7 +68,7 @@ export function useUpdateAppointmentStatus() {
 export function useCancelAppointment() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => api.delete<void>(`/v1/appointments/${id}`),
+    mutationFn: (id: string) => api.post<void>(`/v1/appointments/${id}/cancel`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
   })
 }

@@ -30,14 +30,19 @@ async def send_otp(phone: str) -> None:
 
     if not settings.twilio_verify_service_sid:
         raise AppError(503, "OTP_NOT_CONFIGURED", "OTP service is not configured — add TWILIO_VERIFY_SERVICE_SID to your .env")
-    async with httpx.AsyncClient(timeout=10) as http:
-        resp = await http.post(
-            f"{_VERIFY_BASE}/Services/{settings.twilio_verify_service_sid}/Verifications",
-            headers={"Authorization": _auth()},
-            data={"To": phone, "Channel": "sms"},
-        )
+    try:
+        async with httpx.AsyncClient(timeout=10) as http:
+            resp = await http.post(
+                f"{_VERIFY_BASE}/Services/{settings.twilio_verify_service_sid}/Verifications",
+                headers={"Authorization": _auth()},
+                data={"To": phone, "Channel": "sms"},
+            )
+    except httpx.RequestError:
+        log.error("otp_provider_unreachable")
+        raise AppError(503, "OTP_UNAVAILABLE", "OTP service is temporarily unavailable")
     if resp.status_code not in (200, 201):
-        raise AppError(502, "OTP_SEND_FAILED", f"Could not send OTP: {resp.text[:200]}")
+        log.error("otp_send_failed", status=resp.status_code)
+        raise AppError(502, "OTP_SEND_FAILED", "Could not send OTP")
 
 
 async def check_otp(phone: str, code: str) -> bool:
@@ -56,14 +61,19 @@ async def check_otp(phone: str, code: str) -> bool:
 
     if not settings.twilio_verify_service_sid:
         raise AppError(503, "OTP_NOT_CONFIGURED", "OTP service is not configured — add TWILIO_VERIFY_SERVICE_SID to your .env")
-    async with httpx.AsyncClient(timeout=10) as http:
-        resp = await http.post(
-            f"{_VERIFY_BASE}/Services/{settings.twilio_verify_service_sid}/VerificationCheck",
-            headers={"Authorization": _auth()},
-            data={"To": phone, "Code": code},
-        )
+    try:
+        async with httpx.AsyncClient(timeout=10) as http:
+            resp = await http.post(
+                f"{_VERIFY_BASE}/Services/{settings.twilio_verify_service_sid}/VerificationCheck",
+                headers={"Authorization": _auth()},
+                data={"To": phone, "Code": code},
+            )
+    except httpx.RequestError:
+        log.error("otp_provider_unreachable")
+        raise AppError(503, "OTP_UNAVAILABLE", "OTP service is temporarily unavailable")
     if resp.status_code == 404:
         return False
     if resp.status_code not in (200, 201):
-        raise AppError(502, "OTP_CHECK_FAILED", f"OTP check failed: {resp.text[:200]}")
+        log.error("otp_check_failed", status=resp.status_code)
+        raise AppError(502, "OTP_CHECK_FAILED", "OTP verification failed")
     return resp.json().get("status") == "approved"

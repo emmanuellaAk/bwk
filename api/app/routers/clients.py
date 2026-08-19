@@ -12,7 +12,11 @@ from app.errors import AppError
 from app.lib.pagination import Page, decode_cursor, encode_cursor
 from app.models.client import Client
 from app.models.user import User
+from app.models.appointment import Appointment
+from app.models.service import Service
+from app.routers.appointments import _build_response
 from app.schemas.client import ClientCreate, ClientPage, ClientResponse, ClientUpdate
+from app.schemas.appointment import AppointmentResponse
 
 router = APIRouter(prefix="/clients", tags=["clients"])
 
@@ -74,6 +78,22 @@ async def list_clients(
         items=[ClientResponse.model_validate(c) for c in items],
         next_cursor=next_cursor,
     )
+
+
+@router.get("/{client_id}/appointments", response_model=list[AppointmentResponse])
+async def list_client_appointments(
+    client_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[AppointmentResponse]:
+    await _get_or_404(client_id, user, db)
+    result = await db.execute(
+        select(Appointment, Client.name.label("client_name"), Service.name.label("service_name"))
+        .outerjoin(Service, Appointment.service_id == Service.id)
+        .where(Appointment.client_id == client_id, Appointment.salon_id == user.salon_id)
+        .order_by(Appointment.starts_at.desc())
+    )
+    return [_build_response(row.Appointment, row.client_name, row.service_name) for row in result.all()]
 
 
 @router.post("", response_model=ClientResponse, status_code=201)

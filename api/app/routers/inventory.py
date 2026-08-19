@@ -11,12 +11,14 @@ from app.dependencies import get_current_user
 from app.errors import AppError
 from app.models.stock_item import StockItem
 from app.models.stock_purchase import StockPurchase
+from app.models.supplier import Supplier
 from app.models.user import User
 from app.schemas.inventory import (
     RestockRequest,
     StockItemCreate,
     StockItemResponse,
     StockItemUpdate,
+    PurchaseHistoryResponse,
     compute_status,
 )
 
@@ -61,6 +63,35 @@ async def list_stock(
         .order_by(StockItem.color, StockItem.length)
     )
     return [_to_response(i) for i in result.scalars().all()]
+
+
+@router.get("/purchases", response_model=list[PurchaseHistoryResponse])
+async def list_purchases(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[PurchaseHistoryResponse]:
+    result = await db.execute(
+        select(StockPurchase, StockItem.color, StockItem.length, Supplier.name.label("supplier_name"))
+        .outerjoin(StockItem, StockPurchase.stock_item_id == StockItem.id)
+        .outerjoin(Supplier, StockPurchase.supplier_id == Supplier.id)
+        .where(StockPurchase.salon_id == user.salon_id)
+        .order_by(StockPurchase.occurred_at.desc())
+        .limit(20)
+    )
+    return [
+        PurchaseHistoryResponse(
+            id=row.StockPurchase.id,
+            stock_item_id=row.StockPurchase.stock_item_id,
+            color=row.color,
+            length=row.length,
+            supplier_name=row.supplier_name,
+            quantity=row.StockPurchase.quantity,
+            price_per_pack=float(row.StockPurchase.price_per_pack),
+            total=row.StockPurchase.quantity * float(row.StockPurchase.price_per_pack),
+            occurred_at=row.StockPurchase.occurred_at,
+        )
+        for row in result.all()
+    ]
 
 
 @router.post("", response_model=StockItemResponse, status_code=201)
@@ -115,6 +146,10 @@ async def restock_item(
     db: AsyncSession = Depends(get_db),
 ) -> StockItemResponse:
     item = await _get_or_404(item_id, user, db)
+    if body.supplier_id:
+        supplier = await db.get(Supplier, body.supplier_id)
+        if not supplier or supplier.salon_id != user.salon_id:
+            raise AppError(404, "NOT_FOUND", "Supplier not found")
     item.packs += body.quantity
 
     purchase = StockPurchase(

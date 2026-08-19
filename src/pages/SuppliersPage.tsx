@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { cedi } from '@/lib/braider'
 import { cn } from '@/lib/utils'
 import { useSuppliers, useSupplier, type SupplierDetail } from '@/lib/api/hooks/useSuppliers'
+import { useInventory } from '@/lib/api/hooks/useInventory'
+import { usePlaceOrder } from '@/lib/api/hooks/useSuppliers'
 import { tokenStore } from '@/lib/api/token'
 
 // ── Demo fallback ─────────────────────────────────────────────────────────────
@@ -69,7 +71,7 @@ const TruckIcon = ({ color = 'white' }: { color?: string }) => (
 
 // ── API detail panel ──────────────────────────────────────────────────────────
 
-function ApiDetailPanel({ supplierId, onOrder }: { supplierId: string; onOrder: (name: string) => void }) {
+function ApiDetailPanel({ supplierId, onOrder }: { supplierId: string; onOrder: () => void }) {
   const { data, isLoading } = useSupplier(supplierId)
 
   if (isLoading) {
@@ -84,7 +86,7 @@ function ApiDetailPanel({ supplierId, onOrder }: { supplierId: string; onOrder: 
   return <ApiDetail sup={data} onOrder={onOrder} />
 }
 
-function ApiDetail({ sup, onOrder }: { sup: SupplierDetail; onOrder: (name: string) => void }) {
+function ApiDetail({ sup, onOrder }: { sup: SupplierDetail; onOrder: () => void }) {
   const lastOrderDate = sup.last_order_at
     ? new Date(sup.last_order_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
     : '—'
@@ -158,7 +160,7 @@ function ApiDetail({ sup, onOrder }: { sup: SupplierDetail; onOrder: (name: stri
           )}
           <button
             className="mt-4 w-full bg-plum text-white border-none h-[48px] rounded-[14px] font-bold text-[13.5px] cursor-pointer hover:opacity-90 transition-opacity"
-            onClick={() => onOrder(sup.name)}
+             onClick={onOrder}
           >
             Place new order
           </button>
@@ -190,7 +192,7 @@ function ApiDetail({ sup, onOrder }: { sup: SupplierDetail; onOrder: (name: stri
 
 // ── Demo detail panel ─────────────────────────────────────────────────────────
 
-function DemoDetailPanel({ sup, onOrder }: { sup: DemoSupplier; onOrder: (name: string) => void }) {
+function DemoDetailPanel({ sup, onOrder }: { sup: DemoSupplier; onOrder: () => void }) {
   return (
     <div className="flex-1 overflow-y-auto bos-scroll p-6 hidden lg:block">
       <div className="rounded-[20px] p-[20px] mb-5 text-white" style={{ background: 'linear-gradient(150deg,#6E1B3A,#8A2348)' }}>
@@ -235,7 +237,7 @@ function DemoDetailPanel({ sup, onOrder }: { sup: DemoSupplier; onOrder: (name: 
           </div>
           <button
             className="mt-4 w-full bg-plum text-white border-none h-[48px] rounded-[14px] font-bold text-[13.5px] cursor-pointer hover:opacity-90 transition-opacity"
-            onClick={() => onOrder(sup.name)}
+             onClick={onOrder}
           >
             Place new order
           </button>
@@ -273,9 +275,15 @@ function DemoDetailPanel({ sup, onOrder }: { sup: DemoSupplier; onOrder: (name: 
 export function SuppliersPage() {
   const [selectedIdx, setSelectedIdx] = useState(0)
   const [toast, setToast]             = useState<string | null>(null)
+  const [orderSupplierId, setOrderSupplierId] = useState<string | null>(null)
+  const [orderItemId, setOrderItemId] = useState('')
+  const [orderQuantity, setOrderQuantity] = useState('1')
+  const [orderPrice, setOrderPrice] = useState('')
 
   const hasToken = !!tokenStore.get()
   const { data: apiSuppliers, isLoading } = useSuppliers()
+  const { data: inventory } = useInventory()
+  const placeOrder = usePlaceOrder()
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -290,11 +298,55 @@ export function SuppliersPage() {
   const selectedApiId: string | null =
     !isDemo && apiList.length > 0 ? (apiList[selectedIdx]?.id ?? null) : null
 
+  const openOrder = (supplierId: string) => {
+    setOrderSupplierId(supplierId)
+    setOrderItemId(inventory?.[0]?.id ?? '')
+    setOrderPrice(inventory?.[0] ? String(inventory[0].price_per_pack) : '')
+  }
+
+  const submitOrder = async (event: React.FormEvent) => {
+    event.preventDefault()
+    const quantity = Number(orderQuantity)
+    const price = Number(orderPrice)
+    if (!orderSupplierId || !orderItemId || !Number.isInteger(quantity) || quantity <= 0 || !Number.isFinite(price) || price < 0) {
+      showToast('Select an item and enter valid order details')
+      return
+    }
+    try {
+      await placeOrder.mutateAsync({ supplierId: orderSupplierId, items: [{ stock_item_id: orderItemId, quantity, price_per_pack: price }] })
+      setOrderSupplierId(null)
+      showToast('Order placed and stock updated ✓')
+    } catch {
+      showToast('Could not place order')
+    }
+  }
+
   return (
     <div className="flex h-full overflow-hidden relative" style={{ animation: 'bosUp 0.35s ease both' }}>
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-ink text-white text-[13px] font-semibold px-5 py-3 rounded-[14px] shadow-lg" style={{ animation: 'bosUp 0.25s ease both' }}>
           {toast}
+        </div>
+      )}
+      {orderSupplierId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4" onClick={e => { if (e.target === e.currentTarget) setOrderSupplierId(null) }}>
+          <form onSubmit={submitOrder} className="w-full max-w-[420px] bg-white rounded-[20px] p-5 shadow-xl flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-serif text-[20px] font-semibold text-ink m-0">Place order</h2>
+              <button type="button" onClick={() => setOrderSupplierId(null)} className="bg-transparent border-none text-muted cursor-pointer text-lg">×</button>
+            </div>
+            <label className="text-[12px] font-semibold text-muted">Stock item
+              <select value={orderItemId} onChange={e => { setOrderItemId(e.target.value); const item = inventory?.find(i => i.id === e.target.value); if (item) setOrderPrice(String(item.price_per_pack)) }} className="mt-1 w-full border border-line rounded-[11px] px-3 py-2.5 text-[13px]">
+                <option value="">Select stock item</option>
+                {(inventory ?? []).map(item => <option key={item.id} value={item.id}>{item.color} · {item.length}</option>)}
+              </select>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <input value={orderQuantity} onChange={e => setOrderQuantity(e.target.value)} type="number" min="1" placeholder="Quantity" className="border border-line rounded-[11px] px-3 py-2.5 text-[13px]" />
+              <input value={orderPrice} onChange={e => setOrderPrice(e.target.value)} type="number" min="0" step="0.01" placeholder="Price/pack" className="border border-line rounded-[11px] px-3 py-2.5 text-[13px]" />
+            </div>
+            <button type="submit" disabled={placeOrder.isPending} className="bg-plum text-white border-none rounded-[12px] h-[44px] font-bold cursor-pointer disabled:opacity-60">{placeOrder.isPending ? 'Placing…' : 'Place order'}</button>
+          </form>
         </div>
       )}
 
@@ -368,9 +420,9 @@ export function SuppliersPage() {
 
       {/* Right: detail panel */}
       {isDemo
-        ? <DemoDetailPanel sup={demoSup} onOrder={name => showToast(`Order placed with ${name} ✓`)} />
-        : selectedApiId
-          ? <ApiDetailPanel supplierId={selectedApiId} onOrder={name => showToast(`Order placed with ${name} ✓`)} />
+         ? <DemoDetailPanel sup={demoSup} onOrder={() => showToast(`Sign in to place an order with ${demoSup.name}`)} />
+         : selectedApiId
+           ? <ApiDetailPanel supplierId={selectedApiId} onOrder={() => openOrder(selectedApiId)} />
           : <div className="flex-1 hidden lg:flex items-center justify-center text-muted text-[13px]">Select a supplier</div>
       }
     </div>

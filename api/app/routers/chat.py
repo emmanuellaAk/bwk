@@ -13,9 +13,11 @@ from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.errors import AppError
+from app.logger import log
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.client import Client
 from app.models.service import Service
+from app.models.transaction import Transaction, TransactionKind
 from app.models.user import User
 from app.schemas.chat import ChatRequest, ConfirmBookingRequest
 from app.routers.appointments import _check_overlap
@@ -87,6 +89,7 @@ async def _build_context(db: AsyncSession, user: User) -> dict:
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end   = today_start + timedelta(days=1)
     week_start  = today_start - timedelta(days=today_start.weekday())
+    previous_week_start = week_start - timedelta(days=7)
 
     appt_rows = (await db.execute(
         select(Appointment, Client.name.label("client_name"), Service.name.label("service_name"))
@@ -123,6 +126,32 @@ async def _build_context(db: AsyncSession, user: User) -> dict:
             Appointment.salon_id == user.salon_id,
             Appointment.status.in_([AppointmentStatus.confirmed, AppointmentStatus.completed]),
             Appointment.starts_at >= week_start,
+            Appointment.starts_at < today_end,
+        )
+    )).scalar() or 0)
+
+    week_expenses = float((await db.execute(
+        select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+            Transaction.salon_id == user.salon_id,
+            Transaction.kind == TransactionKind.expense,
+            Transaction.occurred_at >= week_start,
+            Transaction.occurred_at < today_end,
+        )
+    )).scalar() or 0)
+    previous_week_revenue = float((await db.execute(
+        select(func.coalesce(func.sum(Appointment.total_price), 0)).where(
+            Appointment.salon_id == user.salon_id,
+            Appointment.status.in_([AppointmentStatus.confirmed, AppointmentStatus.completed]),
+            Appointment.starts_at >= previous_week_start,
+            Appointment.starts_at < week_start,
+        )
+    )).scalar() or 0)
+    week_completed = int((await db.execute(
+        select(func.count(Appointment.id)).where(
+            Appointment.salon_id == user.salon_id,
+            Appointment.status == AppointmentStatus.completed,
+            Appointment.starts_at >= week_start,
+            Appointment.starts_at < today_end,
         )
     )).scalar() or 0)
 
@@ -136,6 +165,10 @@ async def _build_context(db: AsyncSession, user: User) -> dict:
         "appt_rows":     appt_rows,
         "out_rows":      out_rows,
         "week_revenue":  week_rev,
+        "week_expenses": week_expenses,
+        "week_profit":   week_rev - week_expenses,
+        "week_completed": week_completed,
+        "week_delta": ((week_rev - previous_week_revenue) / previous_week_revenue * 100) if previous_week_revenue else None,
         "total_clients": total_clients,
     }
 
@@ -361,28 +394,34 @@ async def chat_stream(
                     })
 
                 elif name == "show_earnings_card":
+                    delta = ctx["week_delta"]
                     yield _sse({
                         "type": "earnings",
                         "value": {
-                            "revenue":   inp.get("revenue", ""),
-                            "expenses":  inp.get("expenses", ""),
-                            "profit":    inp.get("profit", ""),
-                            "delta":     inp.get("delta", ""),
-                            "completed": inp.get("completed", 0),
+                            "revenue":   f"GH₵{ctx['week_revenue']:,.0f}",
+                            "expenses":  f"GH₵{ctx['week_expenses']:,.0f}",
+                            "profit":    f"GH₵{ctx['week_profit']:,.0f}",
+                            "delta":     f"{delta:.1f}%" if delta is not None else "No prior data",
+                            "completed": ctx["week_completed"],
                         },
                     })
 
                 elif name == "show_schedule_card":
+                    schedule_lines = [
+                        f"{row.Appointment.starts_at.strftime('%-I:%M %p')} — {row.client_name or 'Client'} · {row.service_name or 'Appointment'}"
+                        for row in ctx["appt_rows"]
+                    ]
                     yield _sse({
                         "type": "avail",
                         "value": {
-                            "title": inp.get("title", ""),
-                            "body":  inp.get("body", ""),
+                            "title": f"Today's schedule — {len(ctx['appt_rows'])} appointments",
+                            "body": "\n".join(schedule_lines) if schedule_lines else "No appointments scheduled today.",
                         },
                     })
 
-        except Exception as e:
-            yield _sse({"type": "error", "value": str(e)})
+        except Exception:
+            log.error("chat_provider_error", request_id="chat_stream")
+            yield _sse({"type": "error", "value": "The assistant is temporarily unavailable. Please try again."})
 
         yield _sse({"type": "done"})
 

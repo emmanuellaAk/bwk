@@ -13,6 +13,7 @@ from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.errors import AppError
+from app.logger import log
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.client import Client
 from app.models.salon import Salon
@@ -252,7 +253,7 @@ async def update_status(
     return _build_response(appt, client_name, service_name)
 
 
-@router.delete("/{appt_id}", status_code=204)
+@router.post("/{appt_id}/cancel", status_code=204)
 async def cancel_appointment(
     appt_id: uuid.UUID,
     user: User = Depends(get_current_user),
@@ -313,20 +314,22 @@ async def send_reminder(
         f"{settings.twilio_account_sid}:{settings.twilio_auth_token}".encode()
     ).decode()
 
-    async with httpx.AsyncClient(timeout=10) as http:
-        resp = await http.post(
-            f"https://api.twilio.com/2010-04-01/Accounts/{settings.twilio_account_sid}/Messages.json",
-            headers={"Authorization": f"Basic {token}"},
-            data={
-                "From": settings.twilio_whatsapp_from,
-                "To":   to_number,
-                "Body": body,
-            },
-        )
+    try:
+        async with httpx.AsyncClient(timeout=10) as http:
+            resp = await http.post(
+                f"https://api.twilio.com/2010-04-01/Accounts/{settings.twilio_account_sid}/Messages.json",
+                headers={"Authorization": f"Basic {token}"},
+                data={
+                    "From": settings.twilio_whatsapp_from,
+                    "To":   to_number,
+                    "Body": body,
+                },
+            )
+    except httpx.RequestError:
+        log.error("twilio_provider_unreachable", to=to_number)
+        raise AppError(503, "TWILIO_UNAVAILABLE", "WhatsApp service is temporarily unavailable")
 
-    import structlog
-    log = structlog.get_logger()
     log.info("twilio_response", status=resp.status_code, to=to_number, body=resp.text[:500])
 
     if resp.status_code not in (200, 201):
-        raise AppError(502, "TWILIO_ERROR", f"Failed to send reminder: {resp.text[:200]}")
+        raise AppError(502, "TWILIO_ERROR", "Failed to send WhatsApp reminder")

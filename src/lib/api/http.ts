@@ -1,6 +1,7 @@
 import { tokenStore } from './token'
+import { api } from './base'
 import type { ApiClient } from './interface'
-import type { Booking, BookingDraft, ChatEntry } from './types'
+import type { Booking, BookingDraft, ChatEntry, Nudge } from './types'
 
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
@@ -88,9 +89,13 @@ export const httpClient: ApiClient = {
   },
 
   async getNudges() {
-    return []
+    return api.get<Nudge[]>('/v1/nudges')
   },
 
-  async dismissNudge() { return undefined },
-  async actOnNudge() { return undefined },
+  async dismissNudge(nudgeId: string) {
+    await api.post(`/v1/nudges/${encodeURIComponent(nudgeId)}/dismiss`)
+  },
+  async actOnNudge(nudgeId: string) {
+    await api.post(`/v1/nudges/${encodeURIComponent(nudgeId)}/act`)
+  },
 }

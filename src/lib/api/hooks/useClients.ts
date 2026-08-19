@@ -12,6 +12,16 @@ export interface ClientRecord {
   updated_at: string
 }
 
+export interface ClientAppointment {
+  id: string
+  starts_at: string
+  ends_at: string
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled'
+  service_name: string | null
+  total_price: number
+  deposit_paid: number
+}
+
 interface ClientPage {
   items: ClientRecord[]
   next_cursor: string | null
@@ -32,6 +42,15 @@ export function useCreateClient() {
     mutationFn: (body: { name: string; phone?: string; notes?: string; color_hex?: string }) =>
       api.post<ClientRecord>('/v1/clients', body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['clients'] }),
+  })
+}
+
+export function useClientAppointments(id: string | null) {
+  return useQuery({
+    queryKey: ['clients', id, 'appointments'],
+    queryFn: () => api.get<ClientAppointment[]>(`/v1/clients/${id}/appointments`),
+    enabled: !!id,
+    staleTime: 30_000,
   })
 }
 

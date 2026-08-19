@@ -23,6 +23,16 @@ function getWeekStart(offset: number): Date {
   return d
 }
 
+function getMonthGridStart(offset: number): Date {
+  const month = new Date()
+  month.setHours(0, 0, 0, 0)
+  month.setDate(1)
+  month.setMonth(month.getMonth() + offset)
+  const mondayOffset = month.getDay() === 0 ? -6 : 1 - month.getDay()
+  month.setDate(month.getDate() + mondayOffset)
+  return month
+}
+
 function addDays(d: Date, n: number): Date {
   const r = new Date(d)
   r.setDate(r.getDate() + n)
@@ -56,9 +66,9 @@ function fmtShortTime(isoStr: string): string {
   return m === 0 ? `${h12}:00` : `${h12}:${m.toString().padStart(2, '0')}`
 }
 
-function toCalEvent(a: AppointmentRecord, weekStart: Date) {
+function toCalEvent(a: AppointmentRecord, rangeStart: Date) {
   const starts = new Date(a.starts_at)
-  const dayIdx = Math.round((starts.getTime() - weekStart.getTime()) / 86400000)
+  const dayIdx = Math.round((starts.getTime() - rangeStart.getTime()) / 86400000)
   return {
     id:        a.id,
     status:    a.status,
@@ -148,11 +158,13 @@ export function CalendarPage() {
   }
 
   useEffect(() => {
-    const ws = getWeekStart(weekOffset)
-    const idx = weekOffset === 0 ? getTodayDayIdx(ws) : 0
+    const start = view === 'month' ? getMonthGridStart(weekOffset) : getWeekStart(weekOffset)
+    const idx = view === 'month'
+      ? Math.max(0, Math.min(41, Math.round((new Date().setHours(0, 0, 0, 0) - start.getTime()) / 86400000)))
+      : (weekOffset === 0 ? getTodayDayIdx(start) : 0)
     const timer = window.setTimeout(() => setSelectedDay(idx >= 0 ? idx : 0), 0)
     return () => window.clearTimeout(timer)
-  }, [weekOffset])
+  }, [view, weekOffset])
 
   const today = useMemo(() => {
     const d = new Date()
@@ -161,7 +173,8 @@ export function CalendarPage() {
   }, [])
 
   const weekStart = useMemo(() => getWeekStart(weekOffset), [weekOffset])
-  const weekEnd   = useMemo(() => addDays(weekStart, 7),    [weekStart])
+  const rangeStart = view === 'month' ? getMonthGridStart(weekOffset) : weekStart
+  const rangeEnd = addDays(rangeStart, view === 'month' ? 42 : 7)
 
   const weekDays = useMemo(() =>
     Array.from({ length: 6 }, (_, i) => {
@@ -175,17 +188,23 @@ export function CalendarPage() {
     [weekStart, today]
   )
 
-  const { data: apptData } = useAppointments(weekStart, weekEnd)
+  const monthDays = useMemo(() => Array.from({ length: 42 }, (_, i) => {
+    const date = addDays(rangeStart, i)
+    return { date, label: date.getDate(), isToday: isSameDay(date, today) }
+  }), [rangeStart, today])
+
+  const { data: apptData } = useAppointments(rangeStart, rangeEnd)
 
   const apiEvents = useMemo(() => {
     if (!apptData) return []
     return apptData
       .filter(a => a.status !== 'cancelled')
-      .map(a => toCalEvent(a, weekStart))
-      .filter(e => e.dayIdx >= 0 && e.dayIdx <= 5)
-  }, [apptData, weekStart])
+       .map(a => toCalEvent(a, rangeStart))
+       .filter(e => e.dayIdx >= 0 && e.dayIdx < (view === 'month' ? 42 : 6))
+  }, [apptData, rangeStart, view])
 
   const allEvents = apiEvents
+  const selectedDate = addDays(rangeStart, selectedDay)
 
   const toggleFilter = (kind: Kind) => {
     setActiveFilters(prev => {
@@ -200,7 +219,7 @@ export function CalendarPage() {
     })
   }
 
-  const visibleEvents  = allEvents.filter(e => e.dayIdx === selectedDay && activeFilters.has(e.kind))
+  const visibleEvents  = allEvents.filter(e => (view === 'week' || e.dayIdx === selectedDay) && activeFilters.has(e.kind))
   const todayConfirmed = allEvents.filter(e => e.dayIdx === selectedDay && e.kind === 'confirmed')
 
   const confirmedCount = (apptData ?? []).filter(a => a.status !== 'cancelled').length
@@ -245,7 +264,7 @@ export function CalendarPage() {
             </div>
           </div>
           <div className="text-[12px] text-muted font-semibold mt-1">
-            Week of {fmtWeekRange(weekStart)}
+             {view === 'month' ? `Month of ${rangeStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}` : `Week of ${fmtWeekRange(weekStart)}`}
           </div>
         </div>
         <div className="flex bg-surface-2 p-[3px] rounded-[13px] border border-line gap-[3px]">
@@ -270,7 +289,7 @@ export function CalendarPage() {
         <div>
 
           {/* Day pills */}
-          <div className="flex gap-[5px] mb-4">
+          {view !== 'month' && <div className="flex gap-[5px] mb-4">
             {weekDays.map((c, i) => {
               const isSelected = i === selectedDay
               const dayCount = allEvents.filter(e => e.dayIdx === i && e.kind === 'confirmed').length
@@ -300,7 +319,27 @@ export function CalendarPage() {
                 </button>
               )
             })}
-          </div>
+          </div>}
+
+          {view === 'month' && (
+            <div className="grid grid-cols-7 gap-1 mb-5">
+              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
+                <div key={day} className="text-center text-[10px] font-semibold text-muted py-1">{day}</div>
+              ))}
+              {monthDays.map((day, index) => {
+                const count = allEvents.filter(e => e.dayIdx === index && e.kind === 'confirmed').length
+                return (
+                  <button key={index} onClick={() => setSelectedDay(index)} className={cn(
+                    'min-h-[58px] rounded-[10px] border text-left p-2 cursor-pointer',
+                    selectedDay === index ? 'bg-plum text-white border-plum' : day.isToday ? 'bg-white border-plum/40' : 'bg-white border-line'
+                  )}>
+                    <span className="text-[12px] font-bold">{day.label}</span>
+                    {count > 0 && <span className={cn('block text-[10px] mt-2 font-semibold', selectedDay === index ? 'text-white/80' : 'text-plum')}>{count} appt{count !== 1 ? 's' : ''}</span>}
+                  </button>
+                )
+              })}
+            </div>
+          )}
 
           {/* Filter legend */}
           <div className="flex gap-3 mb-5">
@@ -477,7 +516,7 @@ export function CalendarPage() {
           {todayConfirmed.length > 0 && (
             <div className="bg-white border border-line rounded-[18px] p-5">
               <h3 className="font-bold text-[14px] text-ink m-0 mb-3">
-                {weekDays[selectedDay]?.d} {weekDays[selectedDay]?.n} · Confirmed
+                {selectedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · Confirmed
               </h3>
               <div className="flex flex-col gap-[10px]">
                 {todayConfirmed.map((e, i) => (

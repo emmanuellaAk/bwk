@@ -8,6 +8,10 @@ python-multipart>=0.0.20
 
 argon2-cffi>=23.1.0
 python-jose[cryptography]>=3.3.0
+openai>=1.0.0
+
+# Development and regression tests
+pytest>=8.0.0
 
 # Sprint 3 — uncomment when ready
 # redis>=5.0.0

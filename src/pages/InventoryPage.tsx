@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { colorHex, cedi } from '@/lib/braider'
 import { cn } from '@/lib/utils'
-import { useInventory, useRestockItem, type StockItemRecord } from '@/lib/api/hooks/useInventory'
+import { useInventory, useRestockItem, useCreateStockItem, usePurchaseHistory, type StockItemRecord } from '@/lib/api/hooks/useInventory'
 import { tokenStore } from '@/lib/api/token'
 import type { Tab } from '@/components/layout/BottomNav'
 
@@ -102,10 +102,18 @@ interface Props { onNavigate: (tab: Tab) => void }
 export function InventoryPage({ onNavigate }: Props) {
   const [search, setSearch] = useState('')
   const [toast,  setToast]  = useState<string | null>(null)
+  const [showAdd, setShowAdd] = useState(false)
+  const [newColor, setNewColor] = useState('')
+  const [newLength, setNewLength] = useState('')
+  const [newQuantity, setNewQuantity] = useState('1')
+  const [newMax, setNewMax] = useState('20')
+  const [newPrice, setNewPrice] = useState('')
 
   const hasToken = !!tokenStore.get()
   const { data: apiData, isLoading } = useInventory()
   const restock = useRestockItem()
+  const createStock = useCreateStockItem()
+  const { data: purchases } = usePurchaseHistory()
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -138,11 +146,60 @@ export function InventoryPage({ onNavigate }: Props) {
     }
   }
 
+  const handleAddStock = async (event: React.FormEvent) => {
+    event.preventDefault()
+    const color = newColor.trim()
+    const length = newLength.trim()
+    const quantity = Number(newQuantity)
+    const maxPacks = Number(newMax)
+    const price = Number(newPrice)
+    if (!color || !length || !Number.isInteger(quantity) || quantity <= 0 || !Number.isInteger(maxPacks) || maxPacks < 0 || !Number.isFinite(price) || price < 0) {
+      showToast('Enter valid stock details')
+      return
+    }
+    if (isDemo) {
+      showToast('Sign in to save stock updates')
+      return
+    }
+    try {
+      const existing = (apiData ?? []).find(item => item.color.toLowerCase() === color.toLowerCase() && item.length.toLowerCase() === length.toLowerCase())
+      if (existing) {
+        await restock.mutateAsync({ id: existing.id, quantity })
+      } else {
+        await createStock.mutateAsync({ color, length, packs: quantity, max_packs: maxPacks, price_per_pack: price })
+      }
+      setShowAdd(false)
+      setNewColor(''); setNewLength(''); setNewQuantity('1'); setNewMax('20'); setNewPrice('')
+      showToast(existing ? 'Stock update logged ✓' : 'Stock item added ✓')
+    } catch {
+      showToast('Could not save stock update')
+    }
+  }
+
   return (
     <div className="p-6 h-full overflow-y-auto bos-scroll relative" style={{ animation: 'bosUp 0.35s ease both' }}>
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-ink text-white text-[13px] font-semibold px-5 py-3 rounded-[14px] shadow-lg" style={{ animation: 'bosUp 0.25s ease both' }}>
           {toast}
+        </div>
+      )}
+      {showAdd && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4" onClick={e => { if (e.target === e.currentTarget) setShowAdd(false) }}>
+          <form onSubmit={handleAddStock} className="w-full max-w-[420px] bg-white rounded-[20px] p-5 shadow-xl flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-serif text-[20px] font-semibold text-ink m-0">Add stock</h2>
+              <button type="button" onClick={() => setShowAdd(false)} className="bg-transparent border-none text-muted cursor-pointer text-lg">×</button>
+            </div>
+            <p className="text-[12px] text-muted m-0">Existing colour and length combinations will be restocked.</p>
+            <input value={newColor} onChange={e => setNewColor(e.target.value)} placeholder="Colour" className="border border-line rounded-[11px] px-3 py-2.5 text-[13px]" />
+            <input value={newLength} onChange={e => setNewLength(e.target.value)} placeholder="Length" className="border border-line rounded-[11px] px-3 py-2.5 text-[13px]" />
+            <div className="grid grid-cols-3 gap-2">
+              <input value={newQuantity} onChange={e => setNewQuantity(e.target.value)} type="number" min="1" placeholder="Packs" className="border border-line rounded-[11px] px-3 py-2.5 text-[13px]" />
+              <input value={newMax} onChange={e => setNewMax(e.target.value)} type="number" min="0" placeholder="Max packs" className="border border-line rounded-[11px] px-3 py-2.5 text-[13px]" />
+              <input value={newPrice} onChange={e => setNewPrice(e.target.value)} type="number" min="0" step="0.01" placeholder="Price/pack" className="border border-line rounded-[11px] px-3 py-2.5 text-[13px]" />
+            </div>
+            <button type="submit" className="bg-plum text-white border-none rounded-[12px] h-[44px] font-bold cursor-pointer">Save stock update</button>
+          </form>
         </div>
       )}
 
@@ -247,7 +304,7 @@ export function InventoryPage({ onNavigate }: Props) {
 
           <button
             className="mt-4 w-full flex items-center justify-center gap-2 bg-plum-soft text-plum border border-dashed border-plum/25 h-[48px] rounded-[14px] font-bold text-[13.5px] cursor-pointer hover:opacity-85 transition-opacity"
-            onClick={() => showToast('Stock update logged ✓')}
+            onClick={() => setShowAdd(true)}
           >
             <PlusIcon /> Add stock / log purchase
           </button>
@@ -282,25 +339,33 @@ export function InventoryPage({ onNavigate }: Props) {
             )}
           </div>
 
-          {/* Recent purchases — demo only for now */}
+          {/* Recent purchases */}
           <div className="bg-white border border-line rounded-[18px] p-5">
             <h3 className="font-bold text-[14px] text-ink m-0 mb-3">Recent purchases</h3>
             <div className="flex flex-col gap-[10px]">
-              {[
+              {(hasToken ? (purchases ?? []) : [
                 { label: 'Natural Black 18″ × 6', supplier: 'Royal Hair Supplies', amt: 144, date: 'Jul 17' },
                 { label: 'Honey Blonde 20″ × 4',  supplier: 'Royal Hair Supplies', amt: 128, date: 'Jul 14' },
                 { label: 'Burgundy 24″ × 3',       supplier: 'Akosombo Braids Co', amt: 105, date: 'Jun 30' },
                 { label: 'Ombre Grey 22″ × 5',     supplier: 'Royal Hair Supplies', amt: 190, date: 'Jun 22' },
-              ].map((p, i) => (
+              ]).map((p, i) => {
+                const isApi = 'occurred_at' in p
+                const label = isApi ? `${p.color ?? 'Stock'} ${p.length ?? ''} × ${p.quantity}` : p.label
+                const supplier = isApi ? (p.supplier_name ?? 'No supplier') : p.supplier
+                const amount = isApi ? p.total : p.amt
+                const date = isApi ? new Date(p.occurred_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : p.date
+                return (
                 <div key={i} className="flex items-start gap-3">
                   <div className="w-[8px] h-[8px] rounded-full bg-muted/40 flex-none mt-[5px]" />
                   <div className="flex-1 min-w-0">
-                    <div className="font-bold text-[12.5px] text-ink leading-tight">{p.label}</div>
-                    <div className="text-[11px] text-muted mt-[1px]">{p.supplier} · {p.date}</div>
+                    <div className="font-bold text-[12.5px] text-ink leading-tight">{label}</div>
+                    <div className="text-[11px] text-muted mt-[1px]">{supplier} · {date}</div>
                   </div>
-                  <div className="font-bold text-[12.5px] text-ink flex-none">{cedi(p.amt)}</div>
+                  <div className="font-bold text-[12.5px] text-ink flex-none">{cedi(amount)}</div>
                 </div>
-              ))}
+                )
+              })}
+              {hasToken && purchases?.length === 0 && <div className="text-center py-3 text-[12px] text-muted">No purchases recorded yet</div>}
             </div>
           </div>
 
