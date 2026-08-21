@@ -9,15 +9,15 @@ interface Props { title: string; body: string }
 export function AvailConfirmCard({ title, body }: Props) {
   return (
     <div
-      className="self-start w-[min(330px,90%)] ml-[37px] flex items-center gap-[11px] bg-success-bg border border-success/20 rounded-[5px_18px_18px_18px] p-[13px_15px]"
+      className="self-start w-[min(360px,90%)] ml-[37px] flex items-center gap-[11px] bg-white border border-success/20 rounded-[6px_18px_18px_18px] p-[14px_15px] shadow-[0_1px_10px_rgba(34,27,30,0.05)]"
       style={{ animation: 'bosUp 0.4s ease both' }}
     >
-      <span className="w-[34px] h-[34px] rounded-[11px] bg-success text-white flex items-center justify-center flex-none">
+      <span className="w-[34px] h-[34px] rounded-[11px] bg-success-bg text-success flex items-center justify-center flex-none">
         <CheckIcon />
       </span>
       <div>
-        <div className="font-bold text-[13.5px] text-success">{title}</div>
-        <div className="text-[12.5px] text-ink mt-[2px]">{body}</div>
+        <div className="font-bold text-[13.5px] text-ink">{title}</div>
+        <div className="text-[12.5px] text-muted mt-[3px] leading-relaxed">{body}</div>
       </div>
     </div>
   )

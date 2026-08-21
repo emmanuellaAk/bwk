@@ -92,7 +92,7 @@ export function DashboardPage({ onNavigate }: Props) {
   ]
 
   return (
-    <div className="p-6 h-full overflow-y-auto bos-scroll" style={{ animation: 'bosUp 0.35s ease both' }}>
+    <div className="p-4 md:p-7 h-full overflow-y-auto bos-scroll bg-canvas" style={{ animation: 'bosUp 0.35s ease both' }}>
 
       {/* Page title */}
       <div className="mb-6">

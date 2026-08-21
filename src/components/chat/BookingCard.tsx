@@ -91,8 +91,8 @@ export function BookingCard({ booking, onConfirm }: Props) {
         background: '#fff',
         border: isConfirmed ? '1.5px solid #2F7D5B' : '1.5px solid #B5762A',
         boxShadow: isConfirmed
-          ? '0 8px 26px rgba(47,125,91,0.16)'
-          : '0 8px 24px rgba(181,118,42,0.14)',
+          ? '0 14px 32px rgba(52,116,91,0.13)'
+          : '0 14px 32px rgba(164,111,42,0.11)',
         animation: justConfirmed ? 'bosRing 1.2s ease both' : undefined,
       }}
     >
@@ -166,7 +166,7 @@ export function BookingCard({ booking, onConfirm }: Props) {
       )}
 
       {/* Price strip */}
-      <div className="mx-4 mb-[2px] px-[14px] py-[11px] bg-plum-soft rounded-[14px] flex items-center justify-between">
+      <div className="mx-4 mb-[2px] px-[14px] py-[11px] bg-plum-soft border border-plum/10 rounded-[14px] flex items-center justify-between">
         {[
           { label: 'Price',   value: cedi(draft.price),   color: 'text-ink' },
           { label: 'Deposit', value: cedi(draft.deposit), color: 'text-success' },
@@ -189,7 +189,7 @@ export function BookingCard({ booking, onConfirm }: Props) {
           <button
             onClick={handleConfirm}
             disabled={confirming}
-            className="flex-1 bg-plum text-white border-none h-[44px] rounded-[13px] text-[13.5px] font-bold cursor-pointer flex items-center justify-center gap-[7px] shadow-[0_5px_16px_rgba(110,27,58,0.26)] disabled:opacity-60"
+            className="flex-1 bg-plum text-white border-none h-[44px] rounded-[13px] text-[13.5px] font-bold cursor-pointer flex items-center justify-center gap-[7px] shadow-[0_8px_18px_rgba(106,24,56,0.18)] hover:bg-plum-2 transition-colors disabled:opacity-60"
           >
             <CheckIcon />
             {confirming ? 'Confirming…' : 'Confirm booking'}

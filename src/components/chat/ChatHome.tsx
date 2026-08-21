@@ -64,55 +64,55 @@ export function ChatHome() {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="flex-none flex items-center gap-2 px-[14px] py-2 bg-surface border-b border-line">
+      <div className="flex-none flex items-center gap-2 px-4 py-3 bg-canvas border-b border-line">
         <select
           value={activeSessionId ?? ''}
           onChange={event => { setRenaming(false); selectSession(event.target.value || null) }}
-          className="min-w-0 flex-1 bg-surface-2 border border-line rounded-[10px] px-3 py-2 text-[12px] font-semibold text-ink outline-none"
+          className="min-w-0 flex-1 bg-white border border-line rounded-[11px] px-3 py-[9px] text-[12.5px] font-semibold text-ink outline-none shadow-[0_1px_5px_rgba(34,27,30,0.04)]"
           aria-label="Chat session"
         >
           {!activeSessionId && <option value="">New chat</option>}
           {sessions.map(session => <option key={session.id} value={session.id}>{session.title}</option>)}
         </select>
         {activeSessionId && (renaming ? (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <input
               autoFocus
               value={sessionTitle}
               onChange={event => setSessionTitle(event.target.value)}
               onKeyDown={event => { if (event.key === 'Enter') { renameSession(activeSessionId, sessionTitle); setRenaming(false) } }}
-              className="w-[130px] bg-white border border-line rounded-[10px] px-2 py-2 text-[12px] text-ink outline-none"
+              className="w-[136px] bg-white border border-line rounded-[10px] px-2.5 py-[8px] text-[12px] text-ink outline-none"
               aria-label="Session name"
             />
-            <button onClick={() => { renameSession(activeSessionId, sessionTitle); setRenaming(false) }} className="bg-plum text-white border-none rounded-[9px] px-2 py-2 text-[11px] font-bold cursor-pointer">Save</button>
+            <button onClick={() => { renameSession(activeSessionId, sessionTitle); setRenaming(false) }} className="bg-plum text-white border-none rounded-[10px] px-3 py-[8px] text-[11.5px] font-bold cursor-pointer">Save</button>
           </div>
         ) : (
-          <>
-            <button onClick={() => { setSessionTitle(sessions.find(session => session.id === activeSessionId)?.title ?? ''); setRenaming(true) }} className="bg-transparent text-muted border border-line rounded-[9px] px-2 py-2 text-[11px] font-semibold cursor-pointer">Rename</button>
-            <button onClick={() => deleteSession(activeSessionId)} className="bg-transparent text-draft border border-line rounded-[9px] px-2 py-2 text-[11px] font-semibold cursor-pointer">Delete</button>
-          </>
+          <div className="hidden sm:flex items-center gap-1.5">
+            <button onClick={() => { setSessionTitle(sessions.find(session => session.id === activeSessionId)?.title ?? ''); setRenaming(true) }} className="bg-white text-muted border border-line rounded-[10px] px-3 py-[8px] text-[11.5px] font-semibold cursor-pointer hover:text-ink">Rename</button>
+            <button onClick={() => deleteSession(activeSessionId)} className="bg-white text-draft border border-line rounded-[10px] px-3 py-[8px] text-[11.5px] font-semibold cursor-pointer">Delete</button>
+          </div>
         ))}
         <button
           onClick={newSession}
-          className="flex-none bg-plum-soft text-plum border-none rounded-[10px] px-3 py-2 text-[12px] font-bold cursor-pointer"
+          className="flex-none bg-plum text-white border-none rounded-[11px] px-3.5 py-[9px] text-[12px] font-bold cursor-pointer shadow-[0_6px_16px_rgba(106,24,56,0.14)]"
         >
           New chat
         </button>
       </div>
       {/* Scrollable feed */}
       <div ref={feedRef} className="flex-1 min-h-0 overflow-y-auto bos-scroll">
-        <div className="flex flex-col gap-[11px] px-[14px] py-[14px] max-w-[680px] mx-auto">
+        <div className="flex flex-col gap-[12px] px-4 md:px-6 py-6 max-w-[760px] mx-auto">
 
           {/* Greeting */}
-          <div className="flex flex-col items-center text-center pt-[14px] pb-[22px]" style={{ animation: 'bosUp 0.5s ease both' }}>
+          <div className="flex flex-col items-center text-center pt-4 pb-8" style={{ animation: 'bosUp 0.5s ease both' }}>
             <div className="mb-[14px]">
               <LogoAvatar />
             </div>
             <h1 className="font-serif font-medium text-[25px] leading-[1.22] m-0 max-w-[300px] text-ink">
               {greeting}
             </h1>
-            <p className="mt-[9px] text-[13.5px] text-muted max-w-[288px] leading-[1.5]">
-              Tell me what you need done — bookings, money, stock, reminders. I'll handle the operations.
+            <p className="mt-3 text-[13.5px] text-muted max-w-[340px] leading-[1.65]">
+              Ask about bookings, revenue, stock, or reminders. I’ll keep the answer concise and act on the details.
             </p>
           </div>
 
@@ -132,7 +132,7 @@ export function ChatHome() {
               return (
                 <div
                   key={msg.id}
-                  className="self-end max-w-[82%] bg-plum text-white px-[15px] py-3 rounded-[20px_20px_5px_20px] text-[14px] leading-[1.5] whitespace-pre-wrap shadow-[0_4px_14px_rgba(110,27,58,0.18)]"
+                  className="self-end max-w-[82%] bg-plum text-white px-[16px] py-3 rounded-[18px_18px_6px_18px] text-[14px] leading-[1.55] whitespace-pre-wrap shadow-[0_8px_20px_rgba(106,24,56,0.16)]"
                   style={{ animation: 'bosUp 0.3s ease both' }}
                 >
                   {msg.text}
@@ -146,7 +146,7 @@ export function ChatHome() {
                 {(msg.text || msg.streaming) && (
                   <div className="self-start flex gap-[9px] max-w-[90%]">
                     <SmallAvatar />
-                    <div className="bg-surface text-ink px-[15px] py-3 rounded-[5px_20px_20px_20px] text-[14px] leading-[1.55] shadow-[0_3px_14px_rgba(110,27,58,0.07)] border border-line">
+                    <div className="bg-white text-ink px-[16px] py-3 rounded-[6px_18px_18px_18px] text-[14px] leading-[1.6] shadow-[0_1px_10px_rgba(34,27,30,0.06)] border border-line">
                       {msg.streaming && !msg.text ? (
                         <TypingDots />
                       ) : (

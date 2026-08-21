@@ -32,7 +32,7 @@ export function ProactiveNudgeCard({ nudge, onAct, onDismiss }: Props) {
 
   return (
     <div
-      className="self-start w-full bg-surface border border-line rounded-[5px_18px_18px_18px] p-[14px_15px] shadow-[0_4px_16px_rgba(110,27,58,0.08)]"
+      className="self-start w-full bg-white border border-line rounded-[6px_18px_18px_18px] p-[15px_16px] shadow-[0_1px_10px_rgba(34,27,30,0.06)]"
       style={{
         borderLeft: `3px solid ${nudge.accent}`,
         animation: 'bosUp 0.4s ease both',
@@ -50,10 +50,10 @@ export function ProactiveNudgeCard({ nudge, onAct, onDismiss }: Props) {
         {/* Content */}
         <div className="flex-1 min-w-0">
           <span
-            className="text-[9.5px] font-bold uppercase tracking-[0.6px]"
+            className="text-[9.5px] font-bold uppercase tracking-[0.7px]"
             style={{ color: nudge.accent }}
           >
-            Suggested by Kez AI
+            Suggested
           </span>
           <div className="font-bold text-[14px] leading-snug mt-[2px] text-ink">{nudge.title}</div>
           <div className="text-[12.5px] text-muted leading-[1.5] mt-1">{nudge.body}</div>
@@ -71,7 +71,7 @@ export function ProactiveNudgeCard({ nudge, onAct, onDismiss }: Props) {
           <button
             onClick={onAct}
             className={cn(
-              'h-[38px] px-4 rounded-[11px] text-[12.5px] font-bold text-white border-none cursor-pointer transition-opacity hover:opacity-90'
+              'h-[38px] px-4 rounded-[11px] text-[12.5px] font-bold text-white border-none cursor-pointer transition-colors shadow-[0_6px_14px_rgba(34,27,30,0.10)]'
             )}
             style={{ background: nudge.accent }}
           >

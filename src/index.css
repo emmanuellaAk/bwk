@@ -5,19 +5,21 @@
   --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
   --font-serif: 'Bodoni Moda', Georgia, serif;
 
-  --color-ink:        #241C20;
-  --color-plum:       #6E1B3A;
-  --color-plum-2:     #8A2348;
-  --color-plum-soft:  #F6E7EC;
-  --color-muted:      #8A7B80;
-  --color-line:       #EFE3DF;
-  --color-surface:    #ffffff;
-  --color-surface-2:  #FBF1EE;
-  --color-ai-bubble:  #ffffff;
-  --color-success:    #2F7D5B;
-  --color-success-bg: #E7F3EC;
-  --color-draft:      #B5762A;
-  --color-draft-bg:   #FBEFDD;
+  --color-ink:        #221B1E;
+  --color-plum:       #6A1838;
+  --color-plum-2:     #7E2144;
+  --color-plum-soft:  #F5E9ED;
+  --color-muted:      #7E7275;
+  --color-line:       #E9DDD8;
+  --color-surface:    #FFFFFF;
+  --color-surface-2:  #F7F2EF;
+  --color-ai-bubble:  #FFFFFF;
+  --color-success:    #34745B;
+  --color-success-bg: #E8F2EE;
+  --color-draft:      #A46F2A;
+  --color-draft-bg:   #F7EBD9;
+  --color-canvas:     #FAF8F6;
+  --shadow-card:      0 10px 30px rgba(34, 27, 30, 0.07);
 }
 
 @layer base {
@@ -29,7 +31,7 @@
     margin: 0;
     font-family: var(--font-sans);
     color: var(--color-ink);
-    background: radial-gradient(120% 120% at 80% 0%, #F3DDE2 0%, #EFE6E1 38%, #E9E0DC 100%);
+    background: linear-gradient(180deg, #FBF8F6 0%, #F7F2EF 100%);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }

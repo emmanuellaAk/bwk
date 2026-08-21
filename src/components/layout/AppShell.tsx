@@ -52,18 +52,18 @@ export function AppShell({ activeTab, onTabChange, onOpenPortal, onLogout, child
   const ownerInit  = ownerName.charAt(0).toUpperCase()
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-surface">
+    <div className="flex h-dvh overflow-hidden bg-canvas">
 
       {/* ── Desktop sidebar ── */}
-      <aside className="hidden md:flex flex-col w-[248px] flex-none border-r border-line bg-surface px-4 py-5">
+      <aside className="hidden md:flex flex-col w-[264px] flex-none border-r border-line bg-canvas px-5 py-6">
         {/* Brand */}
-        <div className="flex items-center gap-[11px] px-2 pb-5">
-          <div className="w-[42px] h-[42px] rounded-full bg-plum flex items-center justify-center shadow-[0_2px_8px_rgba(110,27,58,0.14)] flex-none">
-            <span className="font-serif font-semibold text-[16px] text-white">{ownerInit}</span>
+        <div className="flex items-center gap-[12px] px-1 pb-6">
+          <div className="w-[44px] h-[44px] rounded-[15px] bg-plum flex items-center justify-center shadow-[0_12px_26px_rgba(106,24,56,0.18)] flex-none">
+            <span className="font-serif font-semibold text-[17px] text-white">{ownerInit}</span>
           </div>
-          <div>
-            <div className="font-serif font-semibold text-[17px] leading-none tracking-[0.3px] text-ink">{salonName}</div>
-            <div className="text-[11px] text-muted mt-[3px] font-medium">Braid with {ownerName}</div>
+          <div className="min-w-0">
+            <div className="font-serif font-semibold text-[17px] leading-none tracking-[0.2px] text-ink truncate">{salonName}</div>
+            <div className="text-[11px] text-muted mt-[5px] font-medium">Salon workspace</div>
           </div>
         </div>
 
@@ -76,8 +76,8 @@ export function AppShell({ activeTab, onTabChange, onOpenPortal, onLogout, child
                 key={id}
                 onClick={() => onTabChange(id)}
                 className={cn(
-                  'flex items-center gap-3 w-full px-[13px] py-[11px] rounded-[13px] text-[13.5px] font-semibold border-none cursor-pointer transition-colors text-left',
-                  isActive ? 'bg-plum-soft text-plum' : 'bg-transparent text-ink hover:bg-surface-2'
+                  'flex items-center gap-3 w-full px-[13px] py-[11px] rounded-[12px] text-[13.5px] font-semibold border border-transparent cursor-pointer transition-all text-left',
+                  isActive ? 'bg-white text-plum shadow-[0_1px_10px_rgba(34,27,30,0.06)]' : 'bg-transparent text-ink/75 hover:bg-white/65 hover:text-ink'
                 )}
               >
                 <span className="flex w-5 justify-center">
@@ -96,7 +96,7 @@ export function AppShell({ activeTab, onTabChange, onOpenPortal, onLogout, child
 
         {/* Bottom */}
         <div className="mt-auto flex flex-col gap-2">
-          <button onClick={onOpenPortal} className="flex items-center gap-[10px] px-[13px] py-[11px] border border-dashed border-line bg-transparent rounded-[13px] cursor-pointer text-ink text-[13px] font-semibold w-full hover:bg-surface-2 transition-colors">
+          <button onClick={onOpenPortal} className="flex items-center gap-[10px] px-[13px] py-[11px] border border-line bg-white rounded-[12px] cursor-pointer text-ink text-[13px] font-semibold w-full hover:border-plum/25 hover:shadow-[0_1px_10px_rgba(34,27,30,0.06)] transition-all">
             <ExternalLink size={17} strokeWidth={2} />
             <span className="flex-1 text-left">Booking page</span>
           </button>
@@ -123,7 +123,7 @@ export function AppShell({ activeTab, onTabChange, onOpenPortal, onLogout, child
       <div className="flex flex-col flex-1 min-w-0 min-h-0 h-full">
 
         {/* Header */}
-        <header className="flex-none flex items-center justify-between px-4 md:px-6 py-3 bg-surface border-b border-line">
+        <header className="flex-none flex items-center justify-between px-4 md:px-7 py-4 bg-canvas/90 backdrop-blur border-b border-line">
           <div className="flex items-center gap-[11px]">
             <div className="relative flex-none">
               <div className="w-10 h-10 rounded-full bg-plum flex items-center justify-center shadow-[0_2px_8px_rgba(110,27,58,0.16)]">
@@ -144,7 +144,7 @@ export function AppShell({ activeTab, onTabChange, onOpenPortal, onLogout, child
             >
               <Settings size={16} strokeWidth={1.8} />
             </button>
-            <button onClick={onOpenPortal} className="flex items-center gap-[7px] bg-plum text-white h-[38px] px-[15px] rounded-[12px] text-[12.5px] font-semibold cursor-pointer border-none hover:opacity-90 transition-opacity">
+            <button onClick={onOpenPortal} className="flex items-center gap-[7px] bg-plum text-white h-[39px] px-[16px] rounded-[12px] text-[12.5px] font-semibold cursor-pointer border-none shadow-[0_8px_20px_rgba(106,24,56,0.18)] hover:bg-plum-2 transition-colors">
               <ExternalLink size={14} strokeWidth={2.2} />
               <span>Booking link</span>
             </button>
@@ -153,17 +153,17 @@ export function AppShell({ activeTab, onTabChange, onOpenPortal, onLogout, child
 
         {/* Body: content + optional right panel */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
-          <main className={cn('flex-1 min-w-0 flex flex-col overflow-hidden', isChat && 'flex flex-col')}>
+          <main className={cn('flex-1 min-w-0 flex flex-col overflow-hidden bg-canvas', isChat && 'flex flex-col')}>
             {children}
           </main>
 
           {/* Desktop right context panel – chat only */}
           {isChat && (
-            <aside className="hidden lg:flex flex-col w-[300px] flex-none border-l border-line bg-surface px-[18px] py-5 overflow-y-auto bos-scroll">
+            <aside className="hidden lg:flex flex-col w-[320px] flex-none border-l border-line bg-canvas px-[20px] py-6 overflow-y-auto bos-scroll">
               <h3 className="font-serif font-semibold text-[16px] m-0 mb-[13px] text-ink">Today at a glance</h3>
               <div className="flex flex-col gap-2 mb-5">
                 {TODAY_APPTS.map(a => (
-                  <div key={a.name} className="flex items-center gap-[10px] bg-surface-2 rounded-[13px] px-[11px] py-[10px]">
+                  <div key={a.name} className="flex items-center gap-[10px] bg-white border border-line rounded-[14px] px-[12px] py-[11px] shadow-[0_1px_8px_rgba(34,27,30,0.04)]">
                     <span
                       className="w-8 h-8 rounded-[10px] flex items-center justify-center text-white font-bold text-[12px] flex-none"
                       style={{ background: a.color }}
@@ -179,10 +179,10 @@ export function AppShell({ activeTab, onTabChange, onOpenPortal, onLogout, child
               </div>
 
               <h3 className="font-serif font-semibold text-[16px] m-0 mb-[11px] text-ink">Earnings</h3>
-              <div className="bg-plum text-white rounded-[16px] p-[15px]">
+              <div className="bg-plum text-white rounded-[18px] p-[17px] shadow-[0_16px_34px_rgba(106,24,56,0.18)]">
                 <div className="text-[11px] opacity-80 font-semibold">This week</div>
-                <div className="font-serif font-bold text-[26px] mt-1">GH₵2,840</div>
-                <div className="text-[11px] opacity-85 mt-1">▲ 18% vs last week</div>
+                <div className="font-serif font-bold text-[27px] mt-1 tracking-[-0.3px]">GH₵2,840</div>
+                <div className="text-[11px] opacity-85 mt-2">▲ 18% vs last week</div>
               </div>
             </aside>
           )}

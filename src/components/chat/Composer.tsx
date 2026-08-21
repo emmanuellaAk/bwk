@@ -47,15 +47,15 @@ export function Composer({ onSend, disabled }: Props) {
   const canSend = value.trim().length > 0 && !disabled
 
   return (
-    <div className="flex-none bg-surface border-t border-line px-[14px] pt-[9px] pb-3">
+    <div className="flex-none bg-canvas border-t border-line px-4 pt-3 pb-4">
       {/* Quick action chips */}
-      <div className="bos-scroll flex gap-[7px] overflow-x-auto pb-[9px] -mx-[2px] px-[2px]">
+      <div className="bos-scroll flex gap-2 overflow-x-auto pb-3 -mx-[2px] px-[2px]">
         {CHIPS.map(chip => (
           <button
             key={chip.label}
             onClick={() => chipSend(chip.label)}
             disabled={disabled}
-            className="flex-none flex items-center gap-[6px] bg-plum-soft text-plum border-none h-[34px] px-[13px] rounded-[18px] text-[12px] font-semibold cursor-pointer whitespace-nowrap disabled:opacity-50"
+            className="flex-none flex items-center gap-[6px] bg-white border border-line text-ink/75 h-[34px] px-[13px] rounded-[17px] text-[12px] font-semibold cursor-pointer whitespace-nowrap transition-all hover:border-plum/25 hover:text-plum disabled:opacity-50"
           >
             <span>{chip.icon}</span>
             {chip.label}
@@ -64,7 +64,7 @@ export function Composer({ onSend, disabled }: Props) {
       </div>
 
       {/* Input row */}
-      <div className="flex items-end gap-2 bg-surface-2 border border-line rounded-[22px] p-[6px_6px_6px_8px]">
+      <div className="flex items-end gap-2 bg-white border border-line rounded-[18px] p-[7px_7px_7px_9px] shadow-[0_1px_10px_rgba(34,27,30,0.06)] focus-within:border-plum/35 transition-colors">
         {/* Camera */}
         <button className="flex-none w-[38px] h-[38px] rounded-full border-none bg-transparent text-muted cursor-pointer flex items-center justify-center hover:bg-line/50 transition-colors">
           <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -113,11 +113,9 @@ export function Composer({ onSend, disabled }: Props) {
       </div>
 
       {/* Hint */}
-      <div className="text-center text-[10.5px] text-muted mt-[7px] flex items-center justify-center gap-[6px]">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="#6E1B3A">
-          <path d="M12 2l1.6 5.4L19 9l-5.4 1.6L12 16l-1.6-5.4L5 9l5.4-1.6z"/>
-        </svg>
-        Paste a message and I'll turn it into a booking automatically
+      <div className="text-center text-[10.5px] text-muted mt-3 flex items-center justify-center gap-[6px]">
+        <span className="w-1 h-1 rounded-full bg-plum/40" />
+        Send booking, inventory, revenue, or customer instructions
       </div>
     </div>
   )
