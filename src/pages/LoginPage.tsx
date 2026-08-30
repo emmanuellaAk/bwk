@@ -76,11 +76,19 @@ export function LoginPage({ onLogin }: Props) {
 
   function handleError(err: unknown) {
     if (err instanceof ApiError) {
+      if (err.code === 'INVALID_OTP') {
+        const remaining = err.details.attempts_remaining
+        setError(
+          typeof remaining === 'number'
+            ? `Code is incorrect. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`
+            : 'Code is incorrect or has expired.'
+        )
+        return
+      }
       const map: Record<string, string> = {
         INVALID_CREDENTIALS: 'Incorrect phone number or password.',
         PHONE_TAKEN:         'An account with this number already exists.',
         EMAIL_TAKEN:         'An account with this email already exists.',
-        INVALID_OTP:         'Code is incorrect or has expired.',
         NOT_FOUND:           'No account found with that phone number.',
         OTP_NOT_CONFIGURED:  'OTP service not set up — contact support.',
         OTP_SEND_FAILED:     'Could not send code. Check your number and try again.',

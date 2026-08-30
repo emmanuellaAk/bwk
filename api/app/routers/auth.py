@@ -110,9 +110,10 @@ async def verify_phone(
     body: VerifyPhoneRequest,
     db: AsyncSession = Depends(get_db),
 ) -> None:
-    approved = await otp_service.check_otp(db, body.phone, body.code)
+    approved, attempts_remaining = await otp_service.check_otp(db, body.phone, body.code)
     if not approved:
-        raise AppError(400, "INVALID_OTP", "Code is incorrect or has expired — request a new one")
+        details = {"attempts_remaining": attempts_remaining} if attempts_remaining is not None else None
+        raise AppError(400, "INVALID_OTP", "Code is incorrect or has expired — request a new one", details)
     await AuthService(db).mark_phone_verified(body.phone)
 
 
@@ -121,7 +122,8 @@ async def reset_password(
     body: ResetPasswordRequest,
     db: AsyncSession = Depends(get_db),
 ) -> None:
-    approved = await otp_service.check_otp(db, body.phone, body.code)
+    approved, attempts_remaining = await otp_service.check_otp(db, body.phone, body.code)
     if not approved:
-        raise AppError(400, "INVALID_OTP", "Code is incorrect or has expired — request a new one")
+        details = {"attempts_remaining": attempts_remaining} if attempts_remaining is not None else None
+        raise AppError(400, "INVALID_OTP", "Code is incorrect or has expired — request a new one", details)
     await AuthService(db).reset_password(body.phone, body.new_password)

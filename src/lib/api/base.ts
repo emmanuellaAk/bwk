@@ -6,11 +6,13 @@ const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? ''
 export class ApiError extends Error {
   readonly status: number
   readonly code: string
+  readonly details: Record<string, unknown>
 
-  constructor(status: number, code: string, message: string) {
+  constructor(status: number, code: string, message: string, details: Record<string, unknown> = {}) {
     super(message)
     this.status = status
     this.code = code
+    this.details = details
     this.name = 'ApiError'
   }
 }
@@ -76,10 +78,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({})) as Record<string, unknown>
+    const { code: _code, message: _message, request_id: _requestId, ...details } = body
     throw new ApiError(
       res.status,
       (body['code'] as string | undefined) ?? 'UNKNOWN',
       (body['message'] as string | undefined) ?? `HTTP ${res.status}`,
+      details,
     )
   }
 

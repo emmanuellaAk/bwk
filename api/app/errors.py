@@ -6,10 +6,11 @@ from app.logger import log
 
 
 class AppError(Exception):
-    def __init__(self, status_code: int, code: str, message: str):
+    def __init__(self, status_code: int, code: str, message: str, details: dict | None = None):
         self.status_code = status_code
         self.code = code
         self.message = message
+        self.details = details or {}
         super().__init__(message)
 
 
@@ -20,7 +21,12 @@ def get_request_id(request: Request) -> str:
 async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,
-        content={"code": exc.code, "message": exc.message, "request_id": get_request_id(request)},
+        content={
+            "code": exc.code,
+            "message": exc.message,
+            "request_id": get_request_id(request),
+            **exc.details,
+        },
     )
 
 
