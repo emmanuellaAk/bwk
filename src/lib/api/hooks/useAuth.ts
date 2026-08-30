@@ -8,15 +8,15 @@ interface TokenResponse {
   is_phone_verified: boolean
 }
 
-export function useLogin(onSuccess: (verified: boolean) => void) {
+export function useLogin(onSuccess: (verified: boolean, phone: string) => void) {
   return useMutation({
     mutationFn: async ({ phone, password }: { phone: string; password: string }) => {
       const data = await api.post<TokenResponse>('/v1/auth/login', { phone: toE164(phone), password })
       tokenStore.set(data.access_token)
       salonStore.setFromToken(data.access_token)
-      return data
+      return { ...data, phone: toE164(phone) }
     },
-    onSuccess: (data) => onSuccess(data.is_phone_verified),
+    onSuccess: (data) => onSuccess(data.is_phone_verified, data.phone),
   })
 }
 
@@ -47,7 +47,7 @@ export function useSendOtp() {
 export function useVerifyPhone(onSuccess: () => void) {
   return useMutation({
     mutationFn: ({ phone, code }: { phone: string; code: string }) =>
-      api.post<void>('/v1/auth/verify-phone', { phone, code }),
+      api.post<void>('/v1/auth/verify-phone', { phone: toE164(phone), code }),
     onSuccess,
   })
 }
@@ -55,7 +55,7 @@ export function useVerifyPhone(onSuccess: () => void) {
 export function useResetPassword(onSuccess: () => void) {
   return useMutation({
     mutationFn: ({ phone, code, new_password }: { phone: string; code: string; new_password: string }) =>
-      api.post<void>('/v1/auth/reset-password', { phone, code, new_password }),
+      api.post<void>('/v1/auth/reset-password', { phone: toE164(phone), code, new_password }),
     onSuccess,
   })
 }

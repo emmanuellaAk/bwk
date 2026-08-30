@@ -102,7 +102,7 @@ async def send_otp(
         result = await db.execute(select(User).where(User.phone == body.phone))
         if not result.scalar_one_or_none():
             return  # don't reveal whether number exists
-    await otp_service.send_otp(body.phone)
+    await otp_service.send_otp(db, body.phone)
 
 
 @router.post("/verify-phone", status_code=204)
@@ -110,7 +110,7 @@ async def verify_phone(
     body: VerifyPhoneRequest,
     db: AsyncSession = Depends(get_db),
 ) -> None:
-    approved = await otp_service.check_otp(body.phone, body.code)
+    approved = await otp_service.check_otp(db, body.phone, body.code)
     if not approved:
         raise AppError(400, "INVALID_OTP", "Code is incorrect or has expired — request a new one")
     await AuthService(db).mark_phone_verified(body.phone)
@@ -121,7 +121,7 @@ async def reset_password(
     body: ResetPasswordRequest,
     db: AsyncSession = Depends(get_db),
 ) -> None:
-    approved = await otp_service.check_otp(body.phone, body.code)
+    approved = await otp_service.check_otp(db, body.phone, body.code)
     if not approved:
         raise AppError(400, "INVALID_OTP", "Code is incorrect or has expired — request a new one")
     await AuthService(db).reset_password(body.phone, body.new_password)

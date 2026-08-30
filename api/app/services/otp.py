@@ -1,41 +1,43 @@
-import base64
 import secrets
 from datetime import datetime, timedelta, timezone
 
 import httpx
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.errors import AppError
 from app.logger import log
+from app.models.user import User
 
-_VERIFY_BASE = "https://verify.twilio.com/v2"
+_API_BASE = "https://api.tryzend.com"
 _DEV_CODE_TTL = timedelta(minutes=10)
 
 # phone -> (code, expires_at) — dev-mode only, replaces real SMS delivery
 _dev_codes: dict[str, tuple[str, datetime]] = {}
 
 
-def _auth() -> str:
-    return "Basic " + base64.b64encode(
-        f"{settings.twilio_account_sid}:{settings.twilio_auth_token}".encode()
-    ).decode()
-
-
-async def send_otp(phone: str) -> None:
+async def send_otp(db: AsyncSession, phone: str) -> None:
     if not settings.is_production:
         code = f"{secrets.randbelow(1_000_000):06d}"
         _dev_codes[phone] = (code, datetime.now(timezone.utc) + _DEV_CODE_TTL)
         log.info("otp_dev_code", phone=phone, code=code)
         return
 
-    if not settings.twilio_verify_service_sid:
-        raise AppError(503, "OTP_NOT_CONFIGURED", "OTP service is not configured — add TWILIO_VERIFY_SERVICE_SID to your .env")
+    if not settings.zend_api_key:
+        raise AppError(503, "OTP_NOT_CONFIGURED", "OTP service is not configured — add ZEND_API_KEY to your .env")
+
+    result = await db.execute(select(User).where(User.phone == phone))
+    user = result.scalar_one_or_none()
+    if not user:
+        return  # caller already checked existence where it matters (reset); no-op otherwise
+
     try:
         async with httpx.AsyncClient(timeout=10) as http:
             resp = await http.post(
-                f"{_VERIFY_BASE}/Services/{settings.twilio_verify_service_sid}/Verifications",
-                headers={"Authorization": _auth()},
-                data={"To": phone, "Channel": "sms"},
+                f"{_API_BASE}/otp/send",
+                headers={"x-api-key": settings.zend_api_key},
+                json={"phone_number": phone, "app": "bwk", "channel": "sms"},
             )
     except httpx.RequestError:
         log.error("otp_provider_unreachable")
@@ -44,8 +46,10 @@ async def send_otp(phone: str) -> None:
         log.error("otp_send_failed", status=resp.status_code)
         raise AppError(502, "OTP_SEND_FAILED", "Could not send OTP")
 
+    user.zend_otp_id = resp.json()["id"]
 
-async def check_otp(phone: str, code: str) -> bool:
+
+async def check_otp(db: AsyncSession, phone: str, code: str) -> bool:
     if not settings.is_production:
         entry = _dev_codes.get(phone)
         if not entry:
@@ -59,14 +63,20 @@ async def check_otp(phone: str, code: str) -> bool:
             del _dev_codes[phone]
         return approved
 
-    if not settings.twilio_verify_service_sid:
-        raise AppError(503, "OTP_NOT_CONFIGURED", "OTP service is not configured — add TWILIO_VERIFY_SERVICE_SID to your .env")
+    if not settings.zend_api_key:
+        raise AppError(503, "OTP_NOT_CONFIGURED", "OTP service is not configured — add ZEND_API_KEY to your .env")
+
+    result = await db.execute(select(User).where(User.phone == phone))
+    user = result.scalar_one_or_none()
+    if not user or not user.zend_otp_id:
+        return False
+
     try:
         async with httpx.AsyncClient(timeout=10) as http:
             resp = await http.post(
-                f"{_VERIFY_BASE}/Services/{settings.twilio_verify_service_sid}/VerificationCheck",
-                headers={"Authorization": _auth()},
-                data={"To": phone, "Code": code},
+                f"{_API_BASE}/otp/{user.zend_otp_id}/verify",
+                headers={"x-api-key": settings.zend_api_key},
+                json={"code": code},
             )
     except httpx.RequestError:
         log.error("otp_provider_unreachable")
@@ -76,4 +86,8 @@ async def check_otp(phone: str, code: str) -> bool:
     if resp.status_code not in (200, 201):
         log.error("otp_check_failed", status=resp.status_code)
         raise AppError(502, "OTP_CHECK_FAILED", "OTP verification failed")
-    return resp.json().get("status") == "approved"
+
+    approved = resp.json().get("success") is True
+    if approved:
+        user.zend_otp_id = None
+    return approved

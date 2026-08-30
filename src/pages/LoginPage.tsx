@@ -51,10 +51,10 @@ export function LoginPage({ onLogin }: Props) {
     return () => clearTimeout(t)
   }, [countdown])
 
-  const login = useLogin((verified) => {
+  const login = useLogin((verified, normPhone) => {
     if (!verified) {
-      setOtpPhone(phone); setScreen('verify-otp')
-      sendOtp.mutate({ phone, purpose: 'verify' }, { onSuccess: startCountdown, onError: handleError })
+      setOtpPhone(normPhone); setScreen('verify-otp')
+      sendOtp.mutate({ phone: normPhone, purpose: 'verify' }, { onSuccess: startCountdown, onError: handleError })
     } else onLogin()
   })
   const register = useRegister((verified, normPhone) => {

@@ -106,4 +106,4 @@ class ResetPasswordRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    is_phone_verified: bool = True
+    is_phone_verified: bool = False
