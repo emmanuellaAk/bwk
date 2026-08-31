@@ -18,14 +18,16 @@ _dev_codes: dict[str, tuple[str, datetime]] = {}
 
 
 async def send_otp(db: AsyncSession, phone: str) -> None:
-    if not settings.is_production:
+    # Use the real provider whenever it's configured — independent of ENV — so
+    # local dev can exercise real SMS delivery; fall back to a logged fake code
+    # only when no key is set (e.g. a fresh checkout with no Zend account yet).
+    if not settings.zend_api_key:
+        if settings.is_production:
+            raise AppError(503, "OTP_NOT_CONFIGURED", "OTP service is not configured — add ZEND_API_KEY to your .env")
         code = f"{secrets.randbelow(1_000_000):06d}"
         _dev_codes[phone] = (code, datetime.now(timezone.utc) + _DEV_CODE_TTL)
         log.info("otp_dev_code", phone=phone, code=code)
         return
-
-    if not settings.zend_api_key:
-        raise AppError(503, "OTP_NOT_CONFIGURED", "OTP service is not configured — add ZEND_API_KEY to your .env")
 
     result = await db.execute(select(User).where(User.phone == phone))
     user = result.scalar_one_or_none()
@@ -52,7 +54,9 @@ async def send_otp(db: AsyncSession, phone: str) -> None:
 async def check_otp(db: AsyncSession, phone: str, code: str) -> tuple[bool, int | None]:
     """Returns (approved, attempts_remaining). attempts_remaining is None when
     the provider doesn't report it (dev mode, or the OTP wasn't found)."""
-    if not settings.is_production:
+    if not settings.zend_api_key:
+        if settings.is_production:
+            raise AppError(503, "OTP_NOT_CONFIGURED", "OTP service is not configured — add ZEND_API_KEY to your .env")
         entry = _dev_codes.get(phone)
         if not entry:
             return False, None
@@ -64,9 +68,6 @@ async def check_otp(db: AsyncSession, phone: str, code: str) -> tuple[bool, int 
         if approved:
             del _dev_codes[phone]
         return approved, None
-
-    if not settings.zend_api_key:
-        raise AppError(503, "OTP_NOT_CONFIGURED", "OTP service is not configured — add ZEND_API_KEY to your .env")
 
     result = await db.execute(select(User).where(User.phone == phone))
     user = result.scalar_one_or_none()

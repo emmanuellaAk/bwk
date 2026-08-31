@@ -1,7 +1,7 @@
 import re
 from typing import Literal, Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, EmailStr, field_validator
 
 _E164 = re.compile(r"^\+\d{10,15}$")
 
@@ -23,7 +23,7 @@ class RegisterRequest(BaseModel):
     phone: str
     password: str
     salon_name: str
-    email: Optional[str] = None
+    email: Optional[EmailStr] = None
 
     @field_validator("phone")
     @classmethod
@@ -47,12 +47,9 @@ class RegisterRequest(BaseModel):
 
     @field_validator("email")
     @classmethod
-    def validate_email(cls, v: Optional[str]) -> Optional[str]:
-        if v:
-            v = v.strip().lower()
-            if "@" not in v or "." not in v.split("@")[-1]:
-                raise ValueError("Enter a valid email address")
-        return v or None
+    def normalise_email(cls, v: Optional[str]) -> Optional[str]:
+        # EmailStr already enforces valid structure; just normalise case/whitespace.
+        return v.strip().lower() if v else None
 
 
 class LoginRequest(BaseModel):
