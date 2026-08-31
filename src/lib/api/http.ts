@@ -5,6 +5,20 @@ import type { Booking, BookingDraft, ChatEntry, Nudge } from './types'
 
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
+// A card-only reply (earnings/schedule/inventory/booking) streams no token text —
+// give the model back a real description of what it showed instead of nothing,
+// so a run of card replies doesn't look like a run of never-answered user turns.
+function entryContent(m: ChatEntry): string | null {
+  if (m.text) return m.text
+  if (m.avail) return `${m.avail.title}: ${m.avail.body}`
+  if (m.earnings) return `This week — revenue ${m.earnings.revenue}, expenses ${m.earnings.expenses}, profit ${m.earnings.profit} (${m.earnings.delta})`
+  if (m.booking) {
+    const d = m.booking.draft
+    return `Booking draft for ${d.name}: ${d.style}, ${d.date} ${d.time}, GH₵${d.price} (GH₵${d.deposit} deposit)`
+  }
+  return null
+}
+
 export const httpClient: ApiClient = {
   async *streamMessage(text: string, history: readonly ChatEntry[]) {
     const token = tokenStore.get()
@@ -13,8 +27,11 @@ export const httpClient: ApiClient = {
     // Build conversation history for the API (exclude in-progress messages)
     const messages = [
       ...history
-        .filter(m => !m.streaming && m.text)
-        .map(m => ({ role: m.role as 'user' | 'assistant', content: m.text })),
+        .filter(m => !m.streaming)
+        .flatMap(m => {
+          const content = entryContent(m)
+          return content ? [{ role: m.role as 'user' | 'assistant', content }] : []
+        }),
       { role: 'user' as const, content: text },
     ]
 

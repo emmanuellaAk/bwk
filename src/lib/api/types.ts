@@ -43,6 +43,12 @@ export interface ChatEntry {
   role: 'user' | 'assistant'
   text: string
   streaming?: boolean
+  // A card-only reply (earnings/schedule/inventory/booking) streams no token
+  // text at all — these carry what was actually shown, so history sent back
+  // to the model reflects it instead of looking like an unanswered turn.
+  booking?: Booking
+  earnings?: EarningsChunk
+  avail?: AvailChunk
 }
 
 export interface StreamChunk {
