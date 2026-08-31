@@ -20,20 +20,22 @@ export function useLogin(onSuccess: (verified: boolean, phone: string) => void) 
   })
 }
 
-export function useRegister(onSuccess: (verified: boolean, phone: string) => void) {
+// Register only stages the signup — no account exists, no tokens issued,
+// until the phone is verified. So there's nothing to log in with yet; we
+// just hand back the normalized phone so the caller can route to the OTP screen.
+export function useRegister(onSuccess: (phone: string) => void) {
   return useMutation({
     mutationFn: async ({ phone, password, salon_name, email }: { phone: string; password: string; salon_name: string; email?: string }) => {
-      const data = await api.post<TokenResponse>('/v1/auth/register', {
-        phone: toE164(phone),
+      const normPhone = toE164(phone)
+      await api.post<void>('/v1/auth/register', {
+        phone: normPhone,
         password,
         salon_name,
         ...(email ? { email } : {}),
       })
-      tokenStore.set(data.access_token)
-      salonStore.setFromToken(data.access_token)
-      return { ...data, phone: toE164(phone) }
+      return normPhone
     },
-    onSuccess: (data) => onSuccess(data.is_phone_verified, data.phone),
+    onSuccess,
   })
 }
 
@@ -44,10 +46,17 @@ export function useSendOtp() {
   })
 }
 
+// Verifying the phone is what actually creates the account (for a fresh
+// signup) or finishes verifying an existing one — either way, this is the
+// point tokens get issued.
 export function useVerifyPhone(onSuccess: () => void) {
   return useMutation({
-    mutationFn: ({ phone, code }: { phone: string; code: string }) =>
-      api.post<void>('/v1/auth/verify-phone', { phone: toE164(phone), code }),
+    mutationFn: async ({ phone, code }: { phone: string; code: string }) => {
+      const data = await api.post<TokenResponse>('/v1/auth/verify-phone', { phone: toE164(phone), code })
+      tokenStore.set(data.access_token)
+      salonStore.setFromToken(data.access_token)
+      return data
+    },
     onSuccess,
   })
 }

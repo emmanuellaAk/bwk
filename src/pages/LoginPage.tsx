@@ -40,6 +40,10 @@ export function LoginPage({ onLogin }: Props) {
   const [showNewPw, setShowNewPw] = useState(false)
   const [otp,       setOtp]       = useState('')
   const [otpPhone,  setOtpPhone]  = useState('')
+  // Where the OTP screen was entered from — controls what "wrong number?" offers:
+  // a fresh signup can just go back and retype the number (nothing real exists yet),
+  // an existing-but-unverified account can't — that number *is* the account.
+  const [otpSource, setOtpSource] = useState<'register' | 'login'>('register')
   const [error,     setError]     = useState('')
   const [countdown, setCountdown] = useState(0)
 
@@ -53,15 +57,13 @@ export function LoginPage({ onLogin }: Props) {
 
   const login = useLogin((verified, normPhone) => {
     if (!verified) {
-      setOtpPhone(normPhone); setScreen('verify-otp')
+      setOtpPhone(normPhone); setOtpSource('login'); setScreen('verify-otp')
       sendOtp.mutate({ phone: normPhone, purpose: 'verify' }, { onSuccess: startCountdown, onError: handleError })
     } else onLogin()
   })
-  const register = useRegister((verified, normPhone) => {
-    if (!verified) {
-      setOtpPhone(normPhone); setScreen('verify-otp')
-      sendOtp.mutate({ phone: normPhone, purpose: 'verify' }, { onSuccess: startCountdown, onError: handleError })
-    } else onLogin()
+  const register = useRegister((normPhone) => {
+    setOtpPhone(normPhone); setOtpSource('register'); setScreen('verify-otp')
+    sendOtp.mutate({ phone: normPhone, purpose: 'verify' }, { onSuccess: startCountdown, onError: handleError })
   })
   const sendOtp     = useSendOtp()
   const verifyPhone = useVerifyPhone(onLogin)
@@ -215,7 +217,10 @@ export function LoginPage({ onLogin }: Props) {
           </div>
         </form>
         <div className="mt-4 text-center">
-          <p className="text-[11.5px] text-muted m-0">Verify your number to continue.</p>
+          {otpSource === 'register'
+            ? <InlineBtn onClick={() => go('register')}><BackIcon /> Entered the wrong number? Edit it</InlineBtn>
+            : <p className="text-[11.5px] text-muted m-0">Verify your number to continue.</p>
+          }
         </div>
       </Shell>
     )

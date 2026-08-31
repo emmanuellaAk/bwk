@@ -6,15 +6,18 @@ from datetime import datetime, timedelta, timezone
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from jose import jwt
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.errors import AppError
+from app.models.pending_registration import PendingRegistration
 from app.models.refresh_token import RefreshToken
 from app.models.salon import Salon
 from app.models.user import User
 from app.schemas.auth import RegisterRequest
+
+_PENDING_TTL = timedelta(minutes=15)  # matches the OTP's own expiry window
 
 _ph = PasswordHasher()
 
@@ -34,9 +37,19 @@ class AuthService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
-    async def register(self, data: RegisterRequest) -> TokenPair:
-        existing = await self.db.execute(select(User).where(User.phone == data.phone))
-        if existing.scalar_one_or_none():
+    async def start_registration(self, data: RegisterRequest) -> PendingRegistration:
+        """Stage a signup. Nothing real (user, salon) is created yet — the
+        account only comes into existence once the phone is verified. This
+        means a mistyped number or an abandoned signup never leaves behind a
+        stuck, unverifiable account: resubmitting the form just overwrites
+        this pending row."""
+        # Opportunistic cleanup — no cron needed, this table stays small on its own.
+        await self.db.execute(
+            delete(PendingRegistration).where(PendingRegistration.created_at < datetime.now(timezone.utc) - _PENDING_TTL)
+        )
+
+        existing_user = await self.db.execute(select(User).where(User.phone == data.phone))
+        if existing_user.scalar_one_or_none():
             raise AppError(409, "PHONE_TAKEN", "An account with this phone number already exists")
 
         if data.email:
@@ -44,18 +57,51 @@ class AuthService:
             if dupe.scalar_one_or_none():
                 raise AppError(409, "EMAIL_TAKEN", "An account with this email already exists")
 
-        salon = Salon(name=data.salon_name)
+        password_hash = _ph.hash(data.password)
+        email = data.email.lower() if data.email else None
+
+        result = await self.db.execute(select(PendingRegistration).where(PendingRegistration.phone == data.phone))
+        pending = result.scalar_one_or_none()
+        if pending:
+            # Re-submitting (e.g. after fixing a typo'd password or salon name) just
+            # refreshes this row in place — no separate "cancel" step needed.
+            pending.password_hash = password_hash
+            pending.salon_name = data.salon_name
+            pending.email = email
+            pending.zend_otp_id = None  # any in-flight code for the old details is now stale
+        else:
+            pending = PendingRegistration(
+                phone=data.phone,
+                password_hash=password_hash,
+                salon_name=data.salon_name,
+                email=email,
+            )
+            self.db.add(pending)
+        await self.db.flush()
+        return pending
+
+    async def finish_registration(self, pending: PendingRegistration) -> TokenPair:
+        """Promote a verified pending signup into a real, verified account."""
+        # Re-check for a race — another request could have claimed this phone/email
+        # in the time between send-otp and verify-phone.
+        existing_user = await self.db.execute(select(User).where(User.phone == pending.phone))
+        if existing_user.scalar_one_or_none():
+            await self.db.delete(pending)
+            raise AppError(409, "PHONE_TAKEN", "An account with this phone number already exists")
+
+        salon = Salon(name=pending.salon_name)
         self.db.add(salon)
         await self.db.flush()
 
         user = User(
             salon_id=salon.id,
-            phone=data.phone,
-            email=data.email.lower() if data.email else None,
-            password_hash=_ph.hash(data.password),
-            is_phone_verified=False,
+            phone=pending.phone,
+            email=pending.email,
+            password_hash=pending.password_hash,
+            is_phone_verified=True,
         )
         self.db.add(user)
+        await self.db.delete(pending)
         await self.db.flush()
 
         return await self._issue_tokens(user)
@@ -104,11 +150,15 @@ class AuthService:
 
         return await self._issue_tokens(user)
 
-    async def mark_phone_verified(self, phone: str) -> None:
+    async def mark_phone_verified(self, phone: str) -> TokenPair:
+        """For an account created before verification finished (legacy path —
+        new signups never reach this unverified, see start_registration)."""
         result = await self.db.execute(select(User).where(User.phone == phone))
         user = result.scalar_one_or_none()
-        if user:
-            user.is_phone_verified = True
+        if not user:
+            raise AppError(404, "NOT_FOUND", "No account with that phone number")
+        user.is_phone_verified = True
+        return await self._issue_tokens(user)
 
     async def reset_password(self, phone: str, new_password: str) -> None:
         result = await self.db.execute(select(User).where(User.phone == phone))
